@@ -4,7 +4,7 @@ $prefix = 'nawasara-whm';
 
 return [
     [
-        'label' => 'WHM / cPanel',
+        'label' => 'WHM Hosting',
         'icon' => 'lucide-server',
         'url' => '',
         'permission' => 'whm.account.view',
