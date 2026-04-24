@@ -90,6 +90,34 @@ class WhmClient
             && Vault::has('whm', 'api_token', $this->instance);
     }
 
+    /**
+     * Test connection to WHM. Called from Vault UI.
+     */
+    public function testConnection(?string $instance = null): array
+    {
+        $client = $instance ? $this->forInstance($instance) : $this;
+
+        if (! $client->isConfigured()) {
+            return ['success' => false, 'message' => 'Credential belum lengkap'];
+        }
+
+        try {
+            $response = $client->api()->get('version', ['api.version' => 1]);
+
+            if ($response->successful() && $response->json('data.version')) {
+                return [
+                    'success' => true,
+                    'message' => 'Terhubung — WHM '.$response->json('data.version'),
+                ];
+            }
+
+            $reason = $response->json('metadata.reason') ?? 'HTTP '.$response->status();
+            return ['success' => false, 'message' => 'Gagal: '.$reason];
+        } catch (\Throwable $e) {
+            return ['success' => false, 'message' => 'Error: '.$e->getMessage()];
+        }
+    }
+
     // ─── Accounts ───────────────────────────────────────
 
     /**
