@@ -60,13 +60,33 @@
             </x-slot:chips>
         </x-nawasara-ui::filter-bar>
 
+        @can('whm.account.suspend')
+            <x-nawasara-ui::bulk-action-bar :count="count($selected)" clearAction="resetSelection" label="akun dipilih">
+                <x-nawasara-ui::button color="warning" variant="outline" size="sm" wire:click="openBulkSuspend">
+                    <x-slot:icon><x-lucide-pause /></x-slot:icon>
+                    Suspend
+                </x-nawasara-ui::button>
+                <x-nawasara-ui::button color="success" variant="outline" size="sm" wire:click="bulkUnsuspend">
+                    <x-slot:icon><x-lucide-play /></x-slot:icon>
+                    Unsuspend
+                </x-nawasara-ui::button>
+            </x-nawasara-ui::bulk-action-bar>
+        @endcan
+
+        @php
+            $selectAllHeader = '<input type="checkbox" wire:model.live="selectAll" class="size-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:bg-neutral-800 dark:border-neutral-600">';
+        @endphp
         <x-nawasara-ui::table
-            :headers="['Username', 'Domain', 'OPD / PIC', 'Package', 'Disk', 'Status', 'Sync', '']"
+            :headers="[$selectAllHeader, 'Username', 'Domain', 'OPD / PIC', 'Package', 'Disk', 'Status', 'Sync', '']"
             :title="'cPanel Accounts (' . $this->accounts->total() . ')'">
             <x-slot:table>
                 @forelse ($this->accounts as $acct)
                     @php $asset = $this->assetMap[$acct->username] ?? null; @endphp
-                    <tr>
+                    <tr wire:key="account-{{ $acct->id }}" class="{{ in_array((string) $acct->id, $selected) ? 'bg-blue-50/50 dark:bg-blue-900/10' : '' }}">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <input type="checkbox" wire:model.live="selected" value="{{ $acct->id }}"
+                                class="size-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:bg-neutral-800 dark:border-neutral-600">
+                        </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-800 dark:text-neutral-200 font-mono">
                             {{ $acct->username }}
                         </td>
@@ -130,7 +150,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="8" class="px-6 py-8 text-center text-sm text-gray-500 dark:text-neutral-400">
+                        <td colspan="9" class="px-6 py-8 text-center text-sm text-gray-500 dark:text-neutral-400">
                             @if ($this->lastSyncedAt === null)
                                 Database masih kosong. Klik <strong>Sync Sekarang</strong> untuk fetch dari WHM.
                             @else
@@ -241,6 +261,22 @@
         <x-slot:footer>
             <x-nawasara-ui::button color="neutral" variant="outline" @click="$dispatch('close-modal', 'whm-password')">Batal</x-nawasara-ui::button>
             <x-nawasara-ui::button type="submit" form="whm-password-form" color="primary">Ubah Password</x-nawasara-ui::button>
+        </x-slot:footer>
+    </x-nawasara-ui::modal>
+
+    {{-- Bulk Suspend Modal --}}
+    <x-nawasara-ui::modal id="whm-bulk-suspend" maxWidth="md" :title="'Bulk Suspend: '.count($selected).' akun'">
+        <form wire:submit="doBulkSuspend" id="whm-bulk-suspend-form" class="space-y-4">
+            <x-nawasara-ui::form.textarea label="Alasan (opsional)" wire:model="bulkSuspendReason"
+                placeholder="Contoh: Telat bayar, melanggar ToS, dll." rows="3" />
+            <p class="text-xs text-yellow-600 dark:text-yellow-400">
+                <x-lucide-alert-triangle class="size-4 inline -mt-0.5" />
+                <strong>{{ count($selected) }}</strong> akun akan di-suspend — website + email mati untuk semua akun ini.
+            </p>
+        </form>
+        <x-slot:footer>
+            <x-nawasara-ui::button color="neutral" variant="outline" @click="$dispatch('close-modal', 'whm-bulk-suspend')">Batal</x-nawasara-ui::button>
+            <x-nawasara-ui::button type="submit" form="whm-bulk-suspend-form" color="danger">Suspend Semua</x-nawasara-ui::button>
         </x-slot:footer>
     </x-nawasara-ui::modal>
 

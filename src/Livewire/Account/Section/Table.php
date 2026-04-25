@@ -54,6 +54,13 @@ class Table extends Component
     // Detail modal
     public ?int $detailId = null;
 
+    // Bulk selection
+    public array $selected = [];
+    public bool $selectAll = false;
+
+    // Bulk suspend modal
+    public string $bulkSuspendReason = '';
+
     protected WhmClient $whm;
 
     public function boot(WhmClient $whm)
@@ -137,10 +144,21 @@ class Table extends Component
             ->keyBy('external_id');
     }
 
-    public function updatedServer(): void { $this->resetPage(); }
-    public function updatedSearch(): void { $this->resetPage(); }
-    public function updatedStatusFilter(): void { $this->resetPage(); }
-    public function updatedPackageFilter(): void { $this->resetPage(); }
+    public function updatedServer(): void { $this->resetPage(); $this->resetSelection(); }
+    public function updatedSearch(): void { $this->resetPage(); $this->resetSelection(); }
+    public function updatedStatusFilter(): void { $this->resetPage(); $this->resetSelection(); }
+    public function updatedPackageFilter(): void { $this->resetPage(); $this->resetSelection(); }
+
+    public function updatedSelectAll(bool $value): void
+    {
+        $this->selected = $value ? $this->accounts->pluck('id')->map(fn ($id) => (string) $id)->all() : [];
+    }
+
+    public function resetSelection(): void
+    {
+        $this->selected = [];
+        $this->selectAll = false;
+    }
 
     // ─── Sync ───────────────────────────────────────────
 
@@ -311,6 +329,80 @@ class Table extends Component
         } catch (\Throwable $e) {
             $this->toastError($e->getMessage());
         }
+    }
+
+    // ─── Bulk Operations ────────────────────────────────
+
+    protected function selectedUsernames(): array
+    {
+        if (empty($this->selected)) {
+            return [];
+        }
+
+        return WhmAccount::forInstance($this->server)
+            ->whereIn('id', $this->selected)
+            ->pluck('username')
+            ->all();
+    }
+
+    public function openBulkSuspend(): void
+    {
+        Gate::authorize('whm.account.suspend');
+
+        if (empty($this->selected)) {
+            $this->toastError('Tidak ada akun yang dipilih.');
+            return;
+        }
+
+        $this->bulkSuspendReason = '';
+        $this->dispatch('modal-open:whm-bulk-suspend');
+    }
+
+    public function doBulkSuspend(): void
+    {
+        Gate::authorize('whm.account.suspend');
+
+        $usernames = $this->selectedUsernames();
+        $count = 0;
+        foreach ($usernames as $username) {
+            try {
+                $this->repo()->update($username, [
+                    'suspend' => true,
+                    'suspend_reason' => $this->bulkSuspendReason ?: null,
+                ]);
+                $count++;
+            } catch (\Throwable $e) {
+                // Skip failures
+            }
+        }
+
+        $this->toastSuccess("Suspend dispatched untuk {$count} akun.");
+        $this->dispatch('modal-close:whm-bulk-suspend');
+        $this->resetSelection();
+    }
+
+    public function bulkUnsuspend(): void
+    {
+        Gate::authorize('whm.account.suspend');
+
+        $usernames = $this->selectedUsernames();
+        if (empty($usernames)) {
+            $this->toastError('Tidak ada akun yang dipilih.');
+            return;
+        }
+
+        $count = 0;
+        foreach ($usernames as $username) {
+            try {
+                $this->repo()->unsuspend($username);
+                $count++;
+            } catch (\Throwable $e) {
+                // Skip failures
+            }
+        }
+
+        $this->toastSuccess("Unsuspend dispatched untuk {$count} akun.");
+        $this->resetSelection();
     }
 
     public function render()

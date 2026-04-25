@@ -51,6 +51,16 @@ class Table extends Component
     // Detail modal
     public ?int $detailId = null;
 
+    // Bulk selection (array of email account IDs)
+    public array $selected = [];
+    public bool $selectAll = false;
+
+    // Bulk quota modal
+    public int $bulkQuotaNew = 250;
+
+    // Bulk password modal (single password applied to all selected)
+    public string $bulkNewPassword = '';
+
     protected WhmClient $whm;
 
     public function boot(WhmClient $whm)
@@ -122,9 +132,20 @@ class Table extends Component
         ], $this->perPage);
     }
 
-    public function updatedSearch(): void { $this->resetPage(); }
-    public function updatedStatusFilter(): void { $this->resetPage(); }
-    public function updatedServer(): void { $this->resetPage(); }
+    public function updatedSearch(): void { $this->resetPage(); $this->resetSelection(); }
+    public function updatedStatusFilter(): void { $this->resetPage(); $this->resetSelection(); }
+    public function updatedServer(): void { $this->resetPage(); $this->resetSelection(); }
+
+    public function updatedSelectAll(bool $value): void
+    {
+        $this->selected = $value ? $this->accounts->pluck('id')->map(fn ($id) => (string) $id)->all() : [];
+    }
+
+    public function resetSelection(): void
+    {
+        $this->selected = [];
+        $this->selectAll = false;
+    }
 
     // ─── Sync ───────────────────────────────────────────
 
@@ -289,6 +310,128 @@ class Table extends Component
     public function detail(): ?WhmEmailAccount
     {
         return $this->detailId ? WhmEmailAccount::find($this->detailId) : null;
+    }
+
+    // ─── Bulk Operations ────────────────────────────────
+
+    /** Resolve selected IDs to email addresses (current instance only). */
+    protected function selectedEmails(): array
+    {
+        if (empty($this->selected)) {
+            return [];
+        }
+
+        return WhmEmailAccount::forInstance($this->server)
+            ->whereIn('id', $this->selected)
+            ->pluck('email')
+            ->all();
+    }
+
+    public function bulkSuspend(): void
+    {
+        Gate::authorize('whm.email.manage');
+
+        $emails = $this->selectedEmails();
+        if (empty($emails)) {
+            $this->toastError('Tidak ada email yang dipilih.');
+            return;
+        }
+
+        $count = 0;
+        foreach ($emails as $email) {
+            try {
+                $this->repo()->update($email, ['suspend_login' => true, 'suspend_incoming' => true]);
+                $count++;
+            } catch (\Throwable $e) {
+                // Skip failures; per-record sync_error will reflect status
+            }
+        }
+
+        $this->toastSuccess("Suspend dispatched untuk {$count} email.");
+        $this->resetSelection();
+    }
+
+    public function bulkUnsuspend(): void
+    {
+        Gate::authorize('whm.email.manage');
+
+        $emails = $this->selectedEmails();
+        if (empty($emails)) {
+            $this->toastError('Tidak ada email yang dipilih.');
+            return;
+        }
+
+        $count = 0;
+        foreach ($emails as $email) {
+            try {
+                $this->repo()->unsuspend($email);
+                $count++;
+            } catch (\Throwable $e) {
+                // Skip failures
+            }
+        }
+
+        $this->toastSuccess("Unsuspend dispatched untuk {$count} email.");
+        $this->resetSelection();
+    }
+
+    public function bulkDelete(): void
+    {
+        Gate::authorize('whm.email.manage');
+
+        $emails = $this->selectedEmails();
+        if (empty($emails)) {
+            $this->toastError('Tidak ada email yang dipilih.');
+            return;
+        }
+
+        $count = 0;
+        foreach ($emails as $email) {
+            try {
+                $this->repo()->delete($email);
+                $count++;
+            } catch (\Throwable $e) {
+                // Skip failures
+            }
+        }
+
+        $this->toastSuccess("Delete dispatched untuk {$count} email.");
+        $this->resetSelection();
+    }
+
+    public function openBulkQuota(): void
+    {
+        Gate::authorize('whm.email.manage');
+
+        if (empty($this->selected)) {
+            $this->toastError('Tidak ada email yang dipilih.');
+            return;
+        }
+
+        $this->bulkQuotaNew = 250;
+        $this->dispatch('modal-open:whm-email-bulk-quota');
+    }
+
+    public function doBulkQuota(): void
+    {
+        Gate::authorize('whm.email.manage');
+
+        $this->validate(['bulkQuotaNew' => 'required|integer|min:0']);
+
+        $emails = $this->selectedEmails();
+        $count = 0;
+        foreach ($emails as $email) {
+            try {
+                $this->repo()->update($email, ['quota_mb' => $this->bulkQuotaNew]);
+                $count++;
+            } catch (\Throwable $e) {
+                // Skip failures
+            }
+        }
+
+        $this->toastSuccess("Quota update dispatched untuk {$count} email.");
+        $this->dispatch('modal-close:whm-email-bulk-quota');
+        $this->resetSelection();
     }
 
     public function render()

@@ -52,12 +52,40 @@
             </x-slot:chips>
         </x-nawasara-ui::filter-bar>
 
+        @can('whm.email.manage')
+            <x-nawasara-ui::bulk-action-bar :count="count($selected)" clearAction="resetSelection" label="email dipilih">
+                <x-nawasara-ui::button color="warning" variant="outline" size="sm" wire:click="bulkSuspend" wire:confirm="Suspend {{ count($selected) }} email yang dipilih?">
+                    <x-slot:icon><x-lucide-pause /></x-slot:icon>
+                    Suspend
+                </x-nawasara-ui::button>
+                <x-nawasara-ui::button color="success" variant="outline" size="sm" wire:click="bulkUnsuspend">
+                    <x-slot:icon><x-lucide-play /></x-slot:icon>
+                    Unsuspend
+                </x-nawasara-ui::button>
+                <x-nawasara-ui::button color="primary" variant="outline" size="sm" wire:click="openBulkQuota">
+                    <x-slot:icon><x-lucide-database /></x-slot:icon>
+                    Set Quota
+                </x-nawasara-ui::button>
+                <x-nawasara-ui::button color="danger" variant="outline" size="sm" wire:click="bulkDelete" wire:confirm="HAPUS {{ count($selected) }} email? Mail akan hilang permanen!">
+                    <x-slot:icon><x-lucide-trash-2 /></x-slot:icon>
+                    Delete
+                </x-nawasara-ui::button>
+            </x-nawasara-ui::bulk-action-bar>
+        @endcan
+
+        @php
+            $selectAllHeader = '<input type="checkbox" wire:model.live="selectAll" class="size-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:bg-neutral-800 dark:border-neutral-600">';
+        @endphp
         <x-nawasara-ui::table
-            :headers="['Email', 'Status', 'Sync', '']"
+            :headers="[$selectAllHeader, 'Email', 'Status', 'Sync', '']"
             :title="'Email Accounts (' . $this->accounts->total() . ')'">
             <x-slot:table>
                 @forelse ($this->accounts as $acct)
-                    <tr>
+                    <tr wire:key="email-{{ $acct->id }}" class="{{ in_array((string) $acct->id, $selected) ? 'bg-blue-50/50 dark:bg-blue-900/10' : '' }}">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <input type="checkbox" wire:model.live="selected" value="{{ $acct->id }}"
+                                class="size-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:bg-neutral-800 dark:border-neutral-600">
+                        </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-800 dark:text-neutral-200 font-mono">
                             {{ $acct->email }}
                         </td>
@@ -89,7 +117,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="4" class="px-6 py-8 text-center text-sm text-gray-500 dark:text-neutral-400">
+                        <td colspan="5" class="px-6 py-8 text-center text-sm text-gray-500 dark:text-neutral-400">
                             @if ($this->lastSyncedAt === null)
                                 Database masih kosong. Klik <strong>Sync Sekarang</strong> untuk fetch dari WHM.
                             @else
@@ -186,6 +214,21 @@
         <x-slot:footer>
             <x-nawasara-ui::button color="neutral" variant="outline" @click="$dispatch('close-modal', 'whm-email-quota')">Batal</x-nawasara-ui::button>
             <x-nawasara-ui::button type="submit" form="whm-email-quota-form" color="primary">Ubah Quota</x-nawasara-ui::button>
+        </x-slot:footer>
+    </x-nawasara-ui::modal>
+
+    {{-- Bulk Quota Modal --}}
+    <x-nawasara-ui::modal id="whm-email-bulk-quota" maxWidth="md" :title="'Bulk Set Quota: '.count($selected).' email'">
+        <form wire:submit="doBulkQuota" id="whm-email-bulk-quota-form" class="space-y-4">
+            <x-nawasara-ui::form.input label="Quota Baru (MB)" type="number"
+                wire:model="bulkQuotaNew" useError errorVariable="bulkQuotaNew" />
+            <p class="text-xs text-gray-500 dark:text-neutral-400">
+                Quota ini akan di-apply ke <strong>{{ count($selected) }}</strong> email account. Isi <code class="font-mono">0</code> untuk unlimited.
+            </p>
+        </form>
+        <x-slot:footer>
+            <x-nawasara-ui::button color="neutral" variant="outline" @click="$dispatch('close-modal', 'whm-email-bulk-quota')">Batal</x-nawasara-ui::button>
+            <x-nawasara-ui::button type="submit" form="whm-email-bulk-quota-form" color="primary">Apply ke Semua</x-nawasara-ui::button>
         </x-slot:footer>
     </x-nawasara-ui::modal>
 
