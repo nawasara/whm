@@ -6,9 +6,7 @@
         </div>
     @else
         <x-nawasara-ui::filter-bar searchPlaceholder="Cari nama package..." searchModel="search">
-            @if (count($this->servers) > 1)
-                <x-nawasara-ui::filter-dropdown label="Server" model="server" :items="$this->serverOptions" />
-            @endif
+            <x-nawasara-whm::server-switcher :servers="$this->servers" role="hosting" />
         </x-nawasara-ui::filter-bar>
 
         <x-nawasara-ui::table

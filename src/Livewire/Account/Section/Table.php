@@ -8,10 +8,18 @@ use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Nawasara\Registry\Models\Asset;
+use Nawasara\Whm\Livewire\Concerns\HasServerRole;
 use Nawasara\Whm\Services\WhmClient;
 
 class Table extends Component
 {
+    use HasServerRole;
+
+    protected function serverRole(): string
+    {
+        return 'hosting';
+    }
+
     #[Url(except: '')]
     public string $server = '';
 
@@ -49,9 +57,8 @@ class Table extends Component
 
     public function mount(): void
     {
-        $instances = $this->whm->instances();
-        if (! $this->server && ! empty($instances)) {
-            $this->server = $instances[0];
+        if (! $this->server) {
+            $this->server = $this->defaultInstance($this->whm) ?? '';
         }
     }
 
@@ -63,7 +70,7 @@ class Table extends Component
     #[Computed]
     public function servers(): array
     {
-        return $this->whm->instances();
+        return $this->rolledInstances($this->whm);
     }
 
     #[Computed]

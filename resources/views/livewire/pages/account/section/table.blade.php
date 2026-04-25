@@ -9,9 +9,7 @@
         </div>
     @else
         <x-nawasara-ui::filter-bar searchPlaceholder="Cari user, domain, email..." searchModel="search">
-            @if (count($this->servers) > 1)
-                <x-nawasara-ui::filter-dropdown label="Server" model="server" :items="$this->serverOptions" />
-            @endif
+            <x-nawasara-whm::server-switcher :servers="$this->servers" role="hosting" />
 
             <x-nawasara-ui::filter-dropdown label="Status" model="statusFilter"
                 :items="['all' => 'Semua Status', 'active' => 'Active', 'suspended' => 'Suspended']" />

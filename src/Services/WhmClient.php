@@ -46,6 +46,44 @@ class WhmClient
         return Vault::instances('whm');
     }
 
+    /**
+     * Get role for a specific instance ('hosting', 'mail', 'both', or null).
+     */
+    public function roleOf(?string $instance): ?string
+    {
+        return Vault::get('whm', 'role', $instance);
+    }
+
+    /**
+     * List instances filtered by role. 'both' instances always included.
+     *
+     * @param  string  $role  'hosting' or 'mail'
+     * @return array  list of instance names
+     */
+    public function instancesByRole(string $role): array
+    {
+        return collect($this->instances())
+            ->filter(function ($instance) use ($role) {
+                $instanceRole = $this->roleOf($instance);
+                // Default behavior for backward compat: instance tanpa role dianggap 'both'.
+                if (! $instanceRole) {
+                    return true;
+                }
+                return $instanceRole === $role || $instanceRole === 'both';
+            })
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Pick a default instance for the given role.
+     * Returns first matching instance or null.
+     */
+    public function defaultInstanceForRole(string $role): ?string
+    {
+        return $this->instancesByRole($role)[0] ?? null;
+    }
+
     protected function credentials(): array
     {
         $key = $this->instance ?? '__default__';

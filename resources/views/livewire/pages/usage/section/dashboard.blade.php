@@ -5,9 +5,7 @@
             <p class="mt-3 text-sm text-gray-700 dark:text-neutral-300 font-medium">Belum ada server WHM dikonfigurasi</p>
         </div>
     @else
-        @if (count($this->servers) > 1)
-            <x-nawasara-ui::filter-dropdown label="Server" model="server" :items="$this->serverOptions" />
-        @endif
+        <x-nawasara-whm::server-switcher :servers="$this->servers" role="hosting" />
 
         {{-- Summary cards (clickable for filter) --}}
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4">

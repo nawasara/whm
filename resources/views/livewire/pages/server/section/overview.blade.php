@@ -10,7 +10,7 @@
     @else
         @if (count($this->servers) > 1)
             <div class="flex items-center justify-between">
-                <x-nawasara-ui::filter-dropdown label="Server" model="server" :items="$this->serverOptions" />
+                <x-nawasara-whm::server-switcher :servers="$this->servers" />
                 <x-nawasara-ui::button color="neutral" variant="outline" size="sm" wire:click="refresh">
                     <x-slot:icon>
                         <x-lucide-refresh-cw wire:loading.class="animate-spin" wire:target="refresh" />
