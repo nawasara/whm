@@ -2,12 +2,17 @@
 
 namespace Nawasara\Whm\Livewire\Usage\Section;
 
-use Livewire\Component;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Url;
+use Livewire\Component;
 use Nawasara\Whm\Livewire\Concerns\HasServerRole;
+use Nawasara\Whm\Models\WhmAccount;
+use Nawasara\Whm\Repositories\WhmAccountRepository;
 use Nawasara\Whm\Services\WhmClient;
 
+/**
+ * Read-only usage dashboard. Reads from DB snapshot — no API calls.
+ */
 class Dashboard extends Component
 {
     use HasServerRole;
@@ -36,9 +41,9 @@ class Dashboard extends Component
         }
     }
 
-    protected function client(): WhmClient
+    protected function repo(): WhmAccountRepository
     {
-        return $this->server ? $this->whm->forInstance($this->server) : $this->whm;
+        return new WhmAccountRepository($this->server ?: null);
     }
 
     #[Computed]
@@ -48,71 +53,48 @@ class Dashboard extends Component
     }
 
     #[Computed]
-    public function serverOptions(): array
+    public function lastSyncedAt(): ?string
     {
-        return collect($this->servers)->mapWithKeys(fn ($s) => [$s => $s])->all();
+        $when = $this->repo()->lastSyncedAt();
+        return $when ? $when->diffForHumans() : null;
     }
 
     /**
-     * Returns accounts enriched with usage percentages + state.
+     * Accounts dengan usage info, sorted by max usage descending.
      */
     #[Computed]
     public function usageList(): array
     {
-        if (! $this->client()->isConfigured()) {
-            return [];
-        }
+        $accounts = WhmAccount::forInstance($this->server)->get();
 
-        $warnThreshold = config('nawasara-whm.usage_warning_threshold', 80);
-        $critThreshold = config('nawasara-whm.usage_critical_threshold', 95);
+        $rows = $accounts->map(function (WhmAccount $acct) {
+            $state = $acct->usageState();
+            return [
+                'user' => $acct->username,
+                'domain' => $acct->domain,
+                'plan' => $acct->plan,
+                'disk_used' => $acct->humanized['diskused'] ?? ($acct->disk_used_mb !== null ? round($acct->disk_used_mb, 1).' MB' : '-'),
+                'disk_limit' => $acct->disk_limit_mb ? $acct->disk_limit_mb.' MB' : 'Unlimited',
+                'disk_pct' => $acct->diskUsagePercent() ?? 0,
+                'bw_used' => $acct->bandwidth_used_mb !== null ? round($acct->bandwidth_used_mb, 1).' MB' : '-',
+                'bw_limit' => $acct->bandwidth_limit_mb ? $acct->bandwidth_limit_mb.' MB' : 'Unlimited',
+                'bw_pct' => $acct->bandwidthUsagePercent() ?? 0,
+                'max_pct' => $acct->maxUsagePercent(),
+                'state' => $state,
+                'suspended' => $acct->suspended,
+            ];
+        });
 
-        $accounts = collect($this->client()->getCachedAccounts())
-            ->map(function ($acct) use ($warnThreshold, $critThreshold) {
-                $diskUsed = $this->parseSize($acct['diskused'] ?? '0');
-                $diskLimit = $this->parseSize($acct['disklimit'] ?? 'unlimited');
-                $bwUsed = $this->parseSize($acct['totalbytes'] ?? $acct['bwused'] ?? '0');
-                $bwLimit = $this->parseSize($acct['bwlimit'] ?? 'unlimited');
-
-                $diskPct = $diskLimit > 0 ? round(($diskUsed / $diskLimit) * 100, 1) : 0;
-                $bwPct = $bwLimit > 0 ? round(($bwUsed / $bwLimit) * 100, 1) : 0;
-
-                $maxPct = max($diskPct, $bwPct);
-
-                $state = 'ok';
-                if ($maxPct >= $critThreshold) $state = 'critical';
-                elseif ($maxPct >= $warnThreshold) $state = 'warning';
-
-                return [
-                    'user' => $acct['user'] ?? '',
-                    'domain' => $acct['domain'] ?? '',
-                    'plan' => $acct['plan'] ?? '',
-                    'disk_used' => $acct['diskused'] ?? '-',
-                    'disk_limit' => $acct['disklimit'] ?? 'unlimited',
-                    'disk_pct' => $diskPct,
-                    'bw_used' => $acct['totalbytes'] ?? $acct['bwused'] ?? '-',
-                    'bw_limit' => $acct['bwlimit'] ?? 'unlimited',
-                    'bw_pct' => $bwPct,
-                    'max_pct' => $maxPct,
-                    'state' => $state,
-                    'suspended' => ($acct['suspended'] ?? 0) == 1,
-                ];
-            });
-
-        // Filter by state
         if ($this->stateFilter) {
-            $accounts = $accounts->where('state', $this->stateFilter);
+            $rows = $rows->where('state', $this->stateFilter);
         }
 
-        return $accounts->sortByDesc('max_pct')->values()->all();
+        return $rows->sortByDesc('max_pct')->values()->all();
     }
 
     #[Computed]
     public function summary(): array
     {
-        if (! $this->client()->isConfigured()) {
-            return ['total' => 0, 'ok' => 0, 'warning' => 0, 'critical' => 0];
-        }
-
         $all = collect($this->usageList);
 
         return [
@@ -130,38 +112,7 @@ class Dashboard extends Component
 
     public function updatedServer(): void
     {
-        unset($this->usageList, $this->summary);
-    }
-
-    /**
-     * Parse size strings like "1500M", "2G", "unlimited" to MB.
-     */
-    protected function parseSize($input): float
-    {
-        if ($input === 'unlimited' || $input === null || $input === '') {
-            return 0;
-        }
-
-        if (is_numeric($input)) {
-            return (float) $input;
-        }
-
-        $input = strtoupper((string) $input);
-
-        if (preg_match('/^([\d.]+)\s*(K|M|G|T)?B?$/', $input, $m)) {
-            $num = (float) $m[1];
-            $unit = $m[2] ?? 'M';
-
-            return match ($unit) {
-                'K' => $num / 1024,
-                'M' => $num,
-                'G' => $num * 1024,
-                'T' => $num * 1024 * 1024,
-                default => $num,
-            };
-        }
-
-        return 0;
+        unset($this->usageList, $this->summary, $this->lastSyncedAt);
     }
 
     public function render()

@@ -8,6 +8,25 @@
             </p>
         </div>
     @else
+        {{-- Sync info bar --}}
+        <div class="mb-3 flex items-center justify-between text-xs text-gray-500 dark:text-neutral-400">
+            <div class="flex items-center gap-3">
+                @if ($this->lastSyncedAt)
+                    <span><x-lucide-clock class="size-3 inline" /> Last sync: {{ $this->lastSyncedAt }}</span>
+                @else
+                    <span class="text-yellow-600">Belum pernah di-sync. Klik "Sync Sekarang" untuk fetch data dari WHM.</span>
+                @endif
+                @if ($this->pendingCount > 0)
+                    <span class="text-blue-600 dark:text-blue-400 animate-pulse">
+                        <x-lucide-clock class="size-3 inline" /> {{ $this->pendingCount }} pending sync
+                    </span>
+                @endif
+            </div>
+            <a href="{{ url('admin/sync/jobs') }}" wire:navigate class="text-blue-600 hover:underline">
+                Lihat Sync Jobs →
+            </a>
+        </div>
+
         <x-nawasara-ui::filter-bar searchPlaceholder="Cari user, domain, email..." searchModel="search">
             <x-nawasara-whm::server-switcher :servers="$this->servers" role="hosting" />
 
@@ -24,7 +43,7 @@
                     <x-slot:icon>
                         <x-lucide-refresh-cw wire:loading.class="animate-spin" wire:target="refreshAccounts" />
                     </x-slot:icon>
-                    Refresh
+                    Sync Sekarang
                 </x-nawasara-ui::button>
             </x-slot:actions>
 
@@ -42,23 +61,17 @@
         </x-nawasara-ui::filter-bar>
 
         <x-nawasara-ui::table
-            :headers="['Username', 'Domain', 'OPD / PIC', 'Package', 'Disk', 'Status', '']"
-            :title="'cPanel Accounts (' . count($this->accounts) . ')'">
+            :headers="['Username', 'Domain', 'OPD / PIC', 'Package', 'Disk', 'Status', 'Sync', '']"
+            :title="'cPanel Accounts (' . $this->accounts->total() . ')'">
             <x-slot:table>
                 @forelse ($this->accounts as $acct)
-                    @php
-                        $username = $acct['user'] ?? '';
-                        $asset = $this->assetMap[$username] ?? null;
-                        $suspended = ($acct['suspended'] ?? 0) == 1;
-                        $diskUsed = $acct['diskused'] ?? '-';
-                        $diskLimit = $acct['disklimit'] ?? 'unlimited';
-                    @endphp
+                    @php $asset = $this->assetMap[$acct->username] ?? null; @endphp
                     <tr>
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-800 dark:text-neutral-200 font-mono">
-                            {{ $username }}
+                            {{ $acct->username }}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-neutral-300">
-                            {{ $acct['domain'] ?? '-' }}
+                            {{ $acct->domain ?? '-' }}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm">
                             @if ($asset && $asset->opd)
@@ -74,20 +87,24 @@
                                 </span>
                             @else
                                 <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500 dark:bg-neutral-700 dark:text-neutral-400">
-                                    Belum di-sync
+                                    Belum di-link
                                 </span>
                             @endif
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm">
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
-                                {{ $acct['plan'] ?? '-' }}
+                                {{ $acct->plan ?? '-' }}
                             </span>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-neutral-400 font-mono">
+                            @php
+                                $diskUsed = $acct->humanized['diskused'] ?? ($acct->disk_used_mb !== null ? $acct->disk_used_mb.'M' : '-');
+                                $diskLimit = $acct->humanized['disklimit'] ?? ($acct->disk_limit_mb ? $acct->disk_limit_mb.'M' : 'unlimited');
+                            @endphp
                             {{ $diskUsed }} / {{ $diskLimit }}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm">
-                            @if ($suspended)
+                            @if ($acct->suspended)
                                 <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400">
                                     Suspended
                                 </span>
@@ -97,29 +114,36 @@
                                 </span>
                             @endif
                         </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm">
+                            <x-nawasara-sync::sync-badge :status="$acct->sync_status" :error="$acct->sync_error" />
+                        </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-right">
-                            <x-nawasara-ui::dropdown-menu-action :id="$username" :items="[
-                                ['type' => 'click', 'label' => 'Detail', 'wire:click' => 'openDetail(\'' . $username . '\')', 'modal' => 'whm-account-detail', 'icon' => 'lucide-eye', 'permission' => 'whm.account.view'],
-                                ['type' => 'click', 'label' => 'Change Password', 'wire:click' => 'openChangePassword(\'' . $username . '\')', 'modal' => 'whm-password', 'icon' => 'lucide-key-round', 'permission' => 'whm.account.manage'],
-                                $suspended
-                                    ? ['type' => 'click', 'label' => 'Unsuspend', 'wire:click' => 'unsuspend(\'' . $username . '\')', 'icon' => 'lucide-play', 'permission' => 'whm.account.suspend']
-                                    : ['type' => 'click', 'label' => 'Suspend', 'wire:click' => 'openSuspend(\'' . $username . '\')', 'modal' => 'whm-suspend', 'icon' => 'lucide-pause', 'permission' => 'whm.account.suspend'],
-                                ['type' => 'click', 'label' => 'Terminate', 'wire:click' => 'terminate(\'' . $username . '\')', 'icon' => 'lucide-trash-2', 'confirm' => 'Yakin hapus akun ini permanen? Semua data akan hilang!', 'permission' => 'whm.account.terminate'],
+                            <x-nawasara-ui::dropdown-menu-action :id="$acct->id" :items="[
+                                ['type' => 'click', 'label' => 'Detail', 'wire:click' => 'openDetail('.$acct->id.')', 'modal' => 'whm-account-detail', 'icon' => 'lucide-eye', 'permission' => 'whm.account.view'],
+                                ['type' => 'click', 'label' => 'Change Password', 'wire:click' => 'openChangePassword(\'' . $acct->username . '\')', 'modal' => 'whm-password', 'icon' => 'lucide-key-round', 'permission' => 'whm.account.manage'],
+                                $acct->suspended
+                                    ? ['type' => 'click', 'label' => 'Unsuspend', 'wire:click' => 'unsuspend(\'' . $acct->username . '\')', 'icon' => 'lucide-play', 'permission' => 'whm.account.suspend']
+                                    : ['type' => 'click', 'label' => 'Suspend', 'wire:click' => 'openSuspend(\'' . $acct->username . '\')', 'modal' => 'whm-suspend', 'icon' => 'lucide-pause', 'permission' => 'whm.account.suspend'],
+                                ['type' => 'click', 'label' => 'Terminate', 'wire:click' => 'terminate(\'' . $acct->username . '\')', 'icon' => 'lucide-trash-2', 'confirm' => 'Yakin hapus akun ini permanen? Semua data akan hilang!', 'permission' => 'whm.account.terminate'],
                             ]" />
                         </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7" class="px-6 py-8 text-center text-sm text-gray-500 dark:text-neutral-400">
-                            @if (! $this->client()?->isConfigured())
-                                Credential WHM belum lengkap. Periksa Vault.
+                        <td colspan="8" class="px-6 py-8 text-center text-sm text-gray-500 dark:text-neutral-400">
+                            @if ($this->lastSyncedAt === null)
+                                Database masih kosong. Klik <strong>Sync Sekarang</strong> untuk fetch dari WHM.
                             @else
-                                Tidak ada akun ditemukan.
+                                Tidak ada akun ditemukan untuk filter ini.
                             @endif
                         </td>
                     </tr>
                 @endforelse
             </x-slot:table>
+
+            <x-slot:footer>
+                {{ $this->accounts->links() }}
+            </x-slot:footer>
         </x-nawasara-ui::table>
     @endif
 
@@ -174,21 +198,30 @@
     </x-nawasara-ui::modal>
 
     {{-- Detail Modal --}}
-    <x-nawasara-ui::modal id="whm-account-detail" maxWidth="2xl" :title="'Detail: '.($detailAccount['user'] ?? '')">
-        @if ($detailAccount)
+    <x-nawasara-ui::modal id="whm-account-detail" maxWidth="2xl" :title="'Detail: '.($this->detail?->username ?? '')">
+        @if ($this->detail)
+            @php $d = $this->detail; @endphp
             <div class="grid grid-cols-2 gap-4 text-sm">
-                <div><span class="text-gray-500 dark:text-neutral-400">Username:</span> <span class="font-medium text-gray-800 dark:text-neutral-200 font-mono">{{ $detailAccount['user'] ?? '-' }}</span></div>
-                <div><span class="text-gray-500 dark:text-neutral-400">Domain:</span> <span class="font-medium text-gray-800 dark:text-neutral-200">{{ $detailAccount['domain'] ?? '-' }}</span></div>
-                <div><span class="text-gray-500 dark:text-neutral-400">Email:</span> <span class="font-medium text-gray-800 dark:text-neutral-200">{{ $detailAccount['email'] ?? '-' }}</span></div>
-                <div><span class="text-gray-500 dark:text-neutral-400">IP:</span> <span class="font-medium text-gray-800 dark:text-neutral-200 font-mono">{{ $detailAccount['ip'] ?? '-' }}</span></div>
-                <div><span class="text-gray-500 dark:text-neutral-400">Package:</span> <span class="font-medium text-gray-800 dark:text-neutral-200">{{ $detailAccount['plan'] ?? '-' }}</span></div>
-                <div><span class="text-gray-500 dark:text-neutral-400">Theme:</span> <span class="font-medium text-gray-800 dark:text-neutral-200">{{ $detailAccount['theme'] ?? '-' }}</span></div>
-                <div><span class="text-gray-500 dark:text-neutral-400">Disk Used:</span> <span class="font-medium text-gray-800 dark:text-neutral-200">{{ $detailAccount['diskused'] ?? '-' }}</span></div>
-                <div><span class="text-gray-500 dark:text-neutral-400">Disk Limit:</span> <span class="font-medium text-gray-800 dark:text-neutral-200">{{ $detailAccount['disklimit'] ?? '-' }}</span></div>
-                <div><span class="text-gray-500 dark:text-neutral-400">Inodes Used:</span> <span class="font-medium text-gray-800 dark:text-neutral-200">{{ $detailAccount['inodesused'] ?? '-' }}</span></div>
-                <div><span class="text-gray-500 dark:text-neutral-400">Inode Limit:</span> <span class="font-medium text-gray-800 dark:text-neutral-200">{{ $detailAccount['inodeslimit'] ?? '-' }}</span></div>
-                <div><span class="text-gray-500 dark:text-neutral-400">Unix Start Date:</span> <span class="font-medium text-gray-800 dark:text-neutral-200">{{ $detailAccount['unix_startdate'] ?? '-' }}</span></div>
-                <div><span class="text-gray-500 dark:text-neutral-400">Suspended:</span> <span class="font-medium text-gray-800 dark:text-neutral-200">{{ ($detailAccount['suspended'] ?? 0) == 1 ? 'Ya' : 'Tidak' }}</span></div>
+                <div><span class="text-gray-500 dark:text-neutral-400">Username:</span> <span class="font-medium font-mono text-gray-800 dark:text-neutral-200">{{ $d->username }}</span></div>
+                <div><span class="text-gray-500 dark:text-neutral-400">Domain:</span> <span class="font-medium text-gray-800 dark:text-neutral-200">{{ $d->domain }}</span></div>
+                <div><span class="text-gray-500 dark:text-neutral-400">Email:</span> <span class="font-medium text-gray-800 dark:text-neutral-200">{{ $d->email ?? '-' }}</span></div>
+                <div><span class="text-gray-500 dark:text-neutral-400">IP:</span> <span class="font-medium font-mono text-gray-800 dark:text-neutral-200">{{ $d->ip ?? '-' }}</span></div>
+                <div><span class="text-gray-500 dark:text-neutral-400">Package:</span> <span class="font-medium text-gray-800 dark:text-neutral-200">{{ $d->plan ?? '-' }}</span></div>
+                <div><span class="text-gray-500 dark:text-neutral-400">Owner:</span> <span class="font-medium text-gray-800 dark:text-neutral-200">{{ $d->owner ?? '-' }}</span></div>
+                <div><span class="text-gray-500 dark:text-neutral-400">Disk Used:</span> <span class="font-medium font-mono text-gray-800 dark:text-neutral-200">{{ $d->humanized['diskused'] ?? ($d->disk_used_mb !== null ? $d->disk_used_mb.' MB' : '-') }}</span></div>
+                <div><span class="text-gray-500 dark:text-neutral-400">Disk Limit:</span> <span class="font-medium font-mono text-gray-800 dark:text-neutral-200">{{ $d->disk_limit_mb ? $d->disk_limit_mb.' MB' : 'Unlimited' }}</span></div>
+                <div><span class="text-gray-500 dark:text-neutral-400">Bandwidth Used:</span> <span class="font-medium font-mono text-gray-800 dark:text-neutral-200">{{ $d->bandwidth_used_mb !== null ? $d->bandwidth_used_mb.' MB' : '-' }}</span></div>
+                <div><span class="text-gray-500 dark:text-neutral-400">Bandwidth Limit:</span> <span class="font-medium font-mono text-gray-800 dark:text-neutral-200">{{ $d->bandwidth_limit_mb ? $d->bandwidth_limit_mb.' MB' : 'Unlimited' }}</span></div>
+                <div><span class="text-gray-500 dark:text-neutral-400">Inodes:</span> <span class="font-medium font-mono text-gray-800 dark:text-neutral-200">{{ $d->inodes_used ?? '-' }} / {{ $d->inodes_limit ?? 'Unlimited' }}</span></div>
+                <div><span class="text-gray-500 dark:text-neutral-400">Status:</span> <span class="font-medium text-gray-800 dark:text-neutral-200">{{ $d->suspended ? 'Suspended' : 'Active' }}</span></div>
+                @if ($d->suspend_reason)
+                    <div class="col-span-2"><span class="text-gray-500 dark:text-neutral-400">Suspend Reason:</span> <span class="text-gray-800 dark:text-neutral-200">{{ $d->suspend_reason }}</span></div>
+                @endif
+                <div><span class="text-gray-500 dark:text-neutral-400">Created:</span> <span class="text-gray-800 dark:text-neutral-200">{{ $d->start_date?->format('d M Y') ?? '-' }}</span></div>
+                <div><span class="text-gray-500 dark:text-neutral-400">Sync Status:</span>
+                    <x-nawasara-sync::sync-badge :status="$d->sync_status" :error="$d->sync_error" />
+                </div>
+                <div><span class="text-gray-500 dark:text-neutral-400">Last Synced:</span> <span class="text-gray-800 dark:text-neutral-200">{{ $d->last_synced_at?->diffForHumans() ?? '-' }}</span></div>
             </div>
         @endif
         <x-slot:footer>

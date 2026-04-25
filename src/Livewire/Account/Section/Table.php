@@ -3,17 +3,23 @@
 namespace Nawasara\Whm\Livewire\Account\Section;
 
 use Illuminate\Support\Facades\Gate;
-use Livewire\Component;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
+use Livewire\Component;
+use Livewire\WithPagination;
 use Nawasara\Registry\Models\Asset;
+use Nawasara\Ui\Livewire\Concerns\HasBrowserToast;
 use Nawasara\Whm\Livewire\Concerns\HasServerRole;
+use Nawasara\Whm\Models\WhmAccount;
+use Nawasara\Whm\Repositories\WhmAccountRepository;
 use Nawasara\Whm\Services\WhmClient;
 
 class Table extends Component
 {
+    use HasBrowserToast;
     use HasServerRole;
+    use WithPagination;
 
     protected function serverRole(): string
     {
@@ -26,9 +32,9 @@ class Table extends Component
     public string $search = '';
     public string $statusFilter = '';
     public string $packageFilter = '';
+    public int $perPage = 25;
 
     // Form modal state (create)
-    public ?string $editingUser = null;
     public string $formUsername = '';
     public string $formDomain = '';
     public string $formPassword = '';
@@ -46,7 +52,7 @@ class Table extends Component
     public string $suspendReason = '';
 
     // Detail modal
-    public ?array $detailAccount = null;
+    public ?int $detailId = null;
 
     protected WhmClient $whm;
 
@@ -62,6 +68,11 @@ class Table extends Component
         }
     }
 
+    protected function repo(): WhmAccountRepository
+    {
+        return new WhmAccountRepository($this->server ?: null);
+    }
+
     protected function client(): WhmClient
     {
         return $this->server ? $this->whm->forInstance($this->server) : $this->whm;
@@ -74,64 +85,47 @@ class Table extends Component
     }
 
     #[Computed]
-    public function serverOptions(): array
+    public function accounts()
     {
-        return collect($this->servers)
-            ->mapWithKeys(fn ($s) => [$s => $s])
-            ->all();
-    }
-
-    #[Computed]
-    public function accounts(): array
-    {
-        if (! $this->client()->isConfigured()) {
-            return [];
-        }
-
-        $accounts = $this->client()->getCachedAccounts();
-
-        // Apply filters
-        return collect($accounts)
-            ->filter(function ($acct) {
-                if ($this->search) {
-                    $needle = strtolower($this->search);
-                    $haystack = strtolower(($acct['user'] ?? '').' '.($acct['domain'] ?? '').' '.($acct['email'] ?? ''));
-                    if (! str_contains($haystack, $needle)) {
-                        return false;
-                    }
-                }
-
-                if ($this->statusFilter) {
-                    $suspended = ($acct['suspended'] ?? 0) == 1;
-                    if ($this->statusFilter === 'active' && $suspended) return false;
-                    if ($this->statusFilter === 'suspended' && ! $suspended) return false;
-                }
-
-                if ($this->packageFilter && ($acct['plan'] ?? '') !== $this->packageFilter) {
-                    return false;
-                }
-
-                return true;
-            })
-            ->values()
-            ->all();
+        return $this->repo()->list([
+            'search' => $this->search ?: null,
+            'status' => $this->statusFilter ?: null,
+            'plan' => $this->packageFilter ?: null,
+        ], $this->perPage);
     }
 
     #[Computed]
     public function packageOptions(): array
     {
-        $packages = $this->client()->getCachedPackages();
-        return collect($packages)
-            ->pluck('name')
-            ->filter()
-            ->mapWithKeys(fn ($n) => [$n => $n])
+        return WhmAccount::forInstance($this->server)
+            ->select('plan')
+            ->distinct()
+            ->whereNotNull('plan')
+            ->orderBy('plan')
+            ->pluck('plan', 'plan')
             ->all();
+    }
+
+    #[Computed]
+    public function lastSyncedAt(): ?string
+    {
+        $when = $this->repo()->lastSyncedAt();
+        return $when ? $when->diffForHumans() : null;
+    }
+
+    #[Computed]
+    public function pendingCount(): int
+    {
+        return WhmAccount::forInstance($this->server)
+            ->pendingSync()
+            ->count();
     }
 
     #[Computed]
     public function assetMap()
     {
-        $usernames = collect($this->accounts)->pluck('user')->filter()->all();
+        // Tetap pakai registry asset linking
+        $usernames = $this->accounts->pluck('username')->filter()->all();
         if (empty($usernames)) {
             return collect();
         }
@@ -143,29 +137,39 @@ class Table extends Component
             ->keyBy('external_id');
     }
 
-    public function updatedServer(): void
-    {
-        unset($this->accounts, $this->packageOptions, $this->assetMap);
-    }
+    public function updatedServer(): void { $this->resetPage(); }
+    public function updatedSearch(): void { $this->resetPage(); }
+    public function updatedStatusFilter(): void { $this->resetPage(); }
+    public function updatedPackageFilter(): void { $this->resetPage(); }
 
-    public function updatedSearch(): void
+    // ─── Sync ───────────────────────────────────────────
+
+    public function refreshAccounts(): void
     {
-        unset($this->accounts);
+        Gate::authorize('whm.account.view');
+
+        $this->repo()->syncNow();
+        $this->toastSuccess('Sync dispatched. Data akan refresh dalam beberapa detik.');
     }
 
     // ─── Detail ─────────────────────────────────────────
 
-    public function openDetail(string $username): void
+    public function openDetail(int $id): void
     {
-        $detail = $this->client()->getAccount($username);
-        $this->detailAccount = $detail;
+        $this->detailId = $id;
         $this->dispatch('modal-open:whm-account-detail');
+    }
+
+    #[Computed]
+    public function detail(): ?WhmAccount
+    {
+        return $this->detailId ? WhmAccount::find($this->detailId) : null;
     }
 
     public function closeDetail(): void
     {
         $this->dispatch('modal-close:whm-account-detail');
-        $this->detailAccount = null;
+        $this->detailId = null;
     }
 
     // ─── Create ─────────────────────────────────────────
@@ -176,7 +180,7 @@ class Table extends Component
         Gate::authorize('whm.account.create');
 
         $this->reset([
-            'editingUser', 'formUsername', 'formDomain', 'formPassword',
+            'formUsername', 'formDomain', 'formPassword',
             'formEmail', 'formPackage', 'formOpdId', 'formPicId',
         ]);
         $this->dispatch('modal-open:whm-account-form');
@@ -194,37 +198,34 @@ class Table extends Component
             'formPackage' => 'required|string',
         ]);
 
-        $result = $this->client()->createAccount([
-            'username' => $this->formUsername,
-            'domain' => $this->formDomain,
-            'password' => $this->formPassword,
-            'contactemail' => $this->formEmail,
-            'plan' => $this->formPackage,
-        ]);
+        try {
+            $this->repo()->create([
+                'username' => $this->formUsername,
+                'domain' => $this->formDomain,
+                'password' => $this->formPassword,
+                'email' => $this->formEmail,
+                'plan' => $this->formPackage,
+            ]);
 
-        if (! $result['success']) {
-            toaster_error('Gagal membuat akun: '.$result['message']);
-            return;
+            // Create registry asset langsung (sebelum sync selesai)
+            Asset::updateOrCreate(
+                ['package_ref' => 'whm', 'external_id' => $this->formUsername],
+                [
+                    'type' => 'hosting_account',
+                    'identifier' => $this->formDomain,
+                    'opd_id' => $this->formOpdId ?: null,
+                    'pic_id' => $this->formPicId ?: null,
+                    'status' => 'active',
+                    'registered_at' => now(),
+                    'notes' => 'WHM account: '.$this->formUsername.' on '.($this->server ?: 'default'),
+                ]
+            );
+
+            $this->toastSuccess("Akun {$this->formUsername} sedang dibuat. Cek status di Sync Jobs.");
+            $this->dispatch('modal-close:whm-account-form');
+        } catch (\Throwable $e) {
+            $this->toastError($e->getMessage());
         }
-
-        // Create registry asset
-        Asset::updateOrCreate(
-            ['package_ref' => 'whm', 'external_id' => $this->formUsername],
-            [
-                'type' => 'hosting_account',
-                'identifier' => $this->formDomain,
-                'opd_id' => $this->formOpdId ?: null,
-                'pic_id' => $this->formPicId ?: null,
-                'status' => 'active',
-                'registered_at' => now(),
-                'notes' => 'WHM account: '.$this->formUsername.' on '.($this->server ?: 'default'),
-            ]
-        );
-
-        $this->client()->flushCache();
-        unset($this->accounts, $this->assetMap);
-        toaster_success('Akun cPanel berhasil dibuat');
-        $this->dispatch('modal-close:whm-account-form');
     }
 
     // ─── Suspend / Unsuspend ────────────────────────────
@@ -242,15 +243,15 @@ class Table extends Component
     {
         Gate::authorize('whm.account.suspend');
 
-        $ok = $this->client()->suspendAccount($this->suspendUsername, $this->suspendReason ?: null);
-
-        if ($ok) {
-            $this->client()->flushCache();
-            unset($this->accounts);
-            toaster_success("Akun {$this->suspendUsername} berhasil di-suspend");
+        try {
+            $this->repo()->update($this->suspendUsername, [
+                'suspend' => true,
+                'suspend_reason' => $this->suspendReason ?: null,
+            ]);
+            $this->toastSuccess("Suspend dispatched untuk {$this->suspendUsername}");
             $this->dispatch('modal-close:whm-suspend');
-        } else {
-            toaster_error('Gagal suspend akun');
+        } catch (\Throwable $e) {
+            $this->toastError($e->getMessage());
         }
     }
 
@@ -258,12 +259,11 @@ class Table extends Component
     {
         Gate::authorize('whm.account.suspend');
 
-        if ($this->client()->unsuspendAccount($username)) {
-            $this->client()->flushCache();
-            unset($this->accounts);
-            toaster_success("Akun {$username} berhasil di-unsuspend");
-        } else {
-            toaster_error('Gagal unsuspend akun');
+        try {
+            $this->repo()->unsuspend($username);
+            $this->toastSuccess("Unsuspend dispatched untuk {$username}");
+        } catch (\Throwable $e) {
+            $this->toastError($e->getMessage());
         }
     }
 
@@ -284,11 +284,12 @@ class Table extends Component
 
         $this->validate(['pwNewPassword' => 'required|min:8']);
 
-        if ($this->client()->changePassword($this->pwUsername, $this->pwNewPassword)) {
-            toaster_success("Password {$this->pwUsername} berhasil diubah");
+        try {
+            $this->repo()->update($this->pwUsername, ['password' => $this->pwNewPassword]);
+            $this->toastSuccess("Password {$this->pwUsername} sedang di-update");
             $this->dispatch('modal-close:whm-password');
-        } else {
-            toaster_error('Gagal mengubah password');
+        } catch (\Throwable $e) {
+            $this->toastError($e->getMessage());
         }
     }
 
@@ -298,25 +299,18 @@ class Table extends Component
     {
         Gate::authorize('whm.account.terminate');
 
-        if ($this->client()->terminateAccount($username)) {
-            // Mark asset as inactive (don't delete — preserve history)
+        try {
+            $this->repo()->delete($username);
+
+            // Mark asset inactive (preserve history)
             Asset::where('package_ref', 'whm')
                 ->where('external_id', $username)
                 ->update(['status' => 'inactive']);
 
-            $this->client()->flushCache();
-            unset($this->accounts, $this->assetMap);
-            toaster_success("Akun {$username} berhasil dihapus");
-        } else {
-            toaster_error('Gagal menghapus akun');
+            $this->toastSuccess("Terminate dispatched untuk {$username}");
+        } catch (\Throwable $e) {
+            $this->toastError($e->getMessage());
         }
-    }
-
-    public function refreshAccounts(): void
-    {
-        $this->client()->flushCache();
-        unset($this->accounts, $this->assetMap, $this->packageOptions);
-        toaster_success('Daftar akun di-refresh');
     }
 
     public function render()
