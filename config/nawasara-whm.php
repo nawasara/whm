@@ -8,7 +8,12 @@ return [
     'cache_ttl' => 300,
 
     // HTTP timeout for WHM API calls (seconds) — WHM bisa lama saat listaccts
-    'timeout' => 30,
+    // atau list_pops_with_disk (1000+ accounts butuh waktu untuk hitung disk usage)
+    'timeout' => 60,
+
+    // Connect timeout (TCP+TLS handshake). Server WHM kadang lambat respond
+    // pas first connection (warmup), naikkan kalau sering timeout connect.
+    'connect_timeout' => 30,
 
     // Usage threshold for "near limit" warning (percent)
     'usage_warning_threshold' => 80,

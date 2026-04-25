@@ -21,6 +21,28 @@ class PermissionSeeder extends Seeder
             'whm.server.view',
             'whm.server.manage',
             'whm.sync.execute',
+
+            // Email management (Day 2)
+            'whm.email.view',
+            'whm.email.create',
+            'whm.email.manage',
+
+            // Mail queue (Day 3)
+            'whm.mailqueue.view',
+            'whm.mailqueue.manage',
+
+            // Mail log (Day 5)
+            'whm.maillog.view',
+
+            // Email stats (Day 4)
+            'whm.emailstats.view',
+
+            // Spam (Day 6)
+            'whm.spam.view',
+            'whm.spam.manage',
+
+            // SSH gating
+            'whm.ssh.execute',
         ];
 
         foreach ($permissions as $permission) {

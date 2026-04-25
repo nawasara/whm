@@ -2,9 +2,10 @@
 
 use Illuminate\Support\Facades\Route;
 use Nawasara\Whm\Livewire\Account\Index as AccountIndex;
-use Nawasara\Whm\Livewire\Usage\Index as UsageIndex;
+use Nawasara\Whm\Livewire\Email\Index as EmailIndex;
 use Nawasara\Whm\Livewire\Package\Index as PackageIndex;
 use Nawasara\Whm\Livewire\Server\Index as ServerIndex;
+use Nawasara\Whm\Livewire\Usage\Index as UsageIndex;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 
 Route::middleware(['web', 'auth'])->prefix('nawasara-whm')->group(function () {
@@ -19,6 +20,10 @@ Route::middleware(['web', 'auth'])->prefix('nawasara-whm')->group(function () {
     Route::get('packages', PackageIndex::class)
         ->middleware(PermissionMiddleware::using('whm.package.view'))
         ->name('nawasara-whm.package.index');
+
+    Route::get('email', EmailIndex::class)
+        ->middleware(PermissionMiddleware::using('whm.email.view'))
+        ->name('nawasara-whm.email.index');
 
     Route::get('server', ServerIndex::class)
         ->middleware(PermissionMiddleware::using('whm.server.view'))

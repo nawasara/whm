@@ -9,31 +9,51 @@ use Illuminate\Support\Str;
 use Symfony\Component\Finder\Finder;
 use Illuminate\Support\ServiceProvider;
 use Nawasara\Whm\Console\Commands\SyncAccountsCommand;
+use Nawasara\Whm\Console\Commands\SyncEmailsCommand;
 use Nawasara\Whm\Services\WhmClient;
 
 class WhmServiceProvider extends ServiceProvider
 {
     public function boot(): void
     {
-        $this->loadRoutesFrom(__DIR__.'/../routes/web.php');
-        $this->loadViewsFrom(__DIR__.'/../resources/views', 'nawasara-whm');
-        Blade::anonymousComponentPath(__DIR__.'/../resources/views/components', 'nawasara-whm');
-        $this->registerLivewire();
-
+        // Register commands FIRST (before any potentially-failing operation)
         if ($this->app->runningInConsole()) {
             $this->commands([
                 SyncAccountsCommand::class,
+                SyncEmailsCommand::class,
             ]);
-
-            $this->app->booted(function () {
-                $schedule = $this->app->make(Schedule::class);
-
-                $schedule->command('whm:sync-accounts')
-                    ->everyThirtyMinutes()
-                    ->withoutOverlapping(25)
-                    ->runInBackground();
-            });
         }
+
+        $this->loadRoutesFrom(__DIR__.'/../routes/web.php');
+        $this->loadViewsFrom(__DIR__.'/../resources/views', 'nawasara-whm');
+        $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
+        Blade::anonymousComponentPath(__DIR__.'/../resources/views/components', 'nawasara-whm');
+        $this->registerLivewire();
+
+        $this->app->booted(function () {
+            if (! $this->app->runningInConsole()) {
+                return;
+            }
+
+            $schedule = $this->app->make(Schedule::class);
+
+            $schedule->command('whm:sync-accounts')
+                ->everyThirtyMinutes()
+                ->withoutOverlapping(25)
+                ->runInBackground();
+
+            // Sync email accounts dari WHM ke DB snapshot — every hour
+            $schedule->command('whm:sync-emails')
+                ->hourly()
+                ->withoutOverlapping(50)
+                ->runInBackground();
+
+            // Heavy disk usage sync — daily at 02:00 (jangan ganggu jam kerja)
+            $schedule->command('whm:sync-emails --with-disk')
+                ->dailyAt('02:00')
+                ->withoutOverlapping(60)
+                ->runInBackground();
+        });
     }
 
     public function register(): void

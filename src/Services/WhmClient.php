@@ -116,7 +116,14 @@ class WhmClient
                 'Authorization' => 'whm '.($creds['username'] ?? '').':'.($creds['api_token'] ?? ''),
             ])
             ->acceptJson()
-            ->timeout(config('nawasara-whm.timeout', 30))
+            ->connectTimeout(config('nawasara-whm.connect_timeout', 30))
+            ->timeout(config('nawasara-whm.timeout', 60))
+            // Force IPv4 — IPv6 routing kadang lambat/timeout di network Indonesia
+            ->withOptions([
+                'curl' => [
+                    CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
+                ],
+            ])
             // Banyak WHM pakai self-signed cert atau cert yang dicheck di level proxy.
             ->withoutVerifying();
     }
@@ -433,6 +440,257 @@ class WhmClient
                 'disk' => $this->getServerDiskUsage(),
             ];
         });
+    }
+
+    // ─── Email Accounts (cPanel UAPI Email module) ──────
+
+    /**
+     * Call cPanel UAPI for a specific cPanel user via WHM API endpoint.
+     * Endpoint: /json-api/cpanel?cpanel_jsonapi_user=...&cpanel_jsonapi_module=...&cpanel_jsonapi_func=...
+     *
+     * Response shape (apiversion=3):
+     * {
+     *   "result": {
+     *     "status": 1,
+     *     "errors": [...] or null,
+     *     "warnings": [...] or null,
+     *     "messages": [...] or null,
+     *     "data": [...] or {...}
+     *   }
+     * }
+     */
+    protected function uapi(string $cpanelUser, string $module, string $function, array $params = [], string $method = 'get'): array
+    {
+        $query = array_merge([
+            'cpanel_jsonapi_user' => $cpanelUser,
+            'cpanel_jsonapi_module' => $module,
+            'cpanel_jsonapi_func' => $function,
+            'cpanel_jsonapi_apiversion' => 3,
+        ], $params);
+
+        // For write operations, send params in body (POST). Auth headers stay the same.
+        $response = $method === 'get'
+            ? $this->api()->get('cpanel', $query)
+            : $this->api()->asForm()->post('cpanel', $query);
+
+        if (! $response->successful()) {
+            return ['success' => false, 'errors' => ['HTTP '.$response->status().': '.$response->body()], 'data' => []];
+        }
+
+        $body = $response->json();
+
+        // WHM wraps cpanel response under 'cpanelresult' for older versions, 'result' for newer.
+        // Strip wrappers until we hit the actual result block.
+        $result = $body['cpanelresult']['result'] ?? $body['result'] ?? $body;
+
+        // Normalize errors/warnings/messages — they can be null, scalar, or array
+        $errors = $result['errors'] ?? [];
+        if (! is_array($errors)) $errors = $errors ? [(string) $errors] : [];
+
+        $warnings = $result['warnings'] ?? [];
+        if (! is_array($warnings)) $warnings = $warnings ? [(string) $warnings] : [];
+
+        $messages = $result['messages'] ?? [];
+        if (! is_array($messages)) $messages = $messages ? [(string) $messages] : [];
+
+        // Status: UAPI uses status=1 for success; WHM API uses metadata.result=1
+        $status = $result['status'] ?? $body['metadata']['result'] ?? null;
+        $success = $status === 1 || $status === '1' || $status === true;
+
+        // Log API call for debugging
+        if (config('app.debug') || config('nawasara-whm.debug', false)) {
+            logger()->info('[WhmClient] UAPI call', [
+                'instance' => $this->instance,
+                'user' => $cpanelUser,
+                'module' => $module,
+                'function' => $function,
+                'method' => $method,
+                'success' => $success,
+                'errors' => $errors,
+                'http_status' => $response->status(),
+                'raw_body' => $body,  // <-- log raw response untuk debug
+            ]);
+        }
+
+        return [
+            'success' => $success,
+            'errors' => $errors,
+            'warnings' => $warnings,
+            'messages' => $messages,
+            'data' => $result['data'] ?? [],
+            'raw' => $body,
+        ];
+    }
+
+    /**
+     * List email accounts under a specific cPanel user.
+     * UAPI: Email::list_pops_with_disk (slower, ~10-60s for 1000+) or list_pops (fast)
+     *
+     * @param  bool  $withDisk  include disk usage (slower for large accounts)
+     */
+    public function listEmailAccounts(string $cpanelUser, bool $withDisk = false): array
+    {
+        $func = $withDisk ? 'list_pops_with_disk' : 'list_pops';
+        $result = $this->uapi($cpanelUser, 'Email', $func);
+
+        return $result['success'] ? ($result['data'] ?? []) : [];
+    }
+
+    /**
+     * Get default cPanel user for the active instance — the parent of all email accounts.
+     * For Kominfo: usually 'ponorogo' (cPanel user owning ponorogo.go.id).
+     *
+     * Strategy:
+     *  1. Use first cPanel account from listAccounts() (works for single-cPanel servers like WHM-Ryder).
+     *  2. Caller can override with explicit user.
+     */
+    public function defaultCpanelUser(): ?string
+    {
+        $accounts = $this->getCachedAccounts();
+        return $accounts[0]['user'] ?? null;
+    }
+
+    public function getCachedEmailAccounts(?string $cpanelUser = null, bool $withDisk = false): array
+    {
+        $cpanelUser ??= $this->defaultCpanelUser();
+        if (! $cpanelUser) return [];
+
+        $suffix = $withDisk ? ':disk' : ':light';
+        $key = 'whm_email_accounts:'.($this->instance ?? 'default').':'.$cpanelUser.$suffix;
+        // Disk-included version cache lebih lama (mahal di-call), light version 5 menit standar
+        $ttl = $withDisk ? 600 : config('nawasara-whm.cache_ttl', 300);
+
+        return Cache::remember($key, $ttl, function () use ($cpanelUser, $withDisk) {
+            return $this->listEmailAccounts($cpanelUser, $withDisk);
+        });
+    }
+
+    /**
+     * Create new email account.
+     * UAPI: Email::add_pop
+     */
+    public function createEmailAccount(string $cpanelUser, string $email, string $password, int $quotaMb = 250): array
+    {
+        // Email format: localpart@domain → split untuk UAPI
+        [$localPart, $domain] = array_pad(explode('@', $email, 2), 2, null);
+
+        if (! $localPart || ! $domain) {
+            return ['success' => false, 'errors' => ['Format email tidak valid'], 'data' => []];
+        }
+
+        return $this->uapi($cpanelUser, 'Email', 'add_pop', [
+            'email' => $localPart,
+            'domain' => $domain,
+            'password' => $password,
+            'quota' => $quotaMb,
+        ], 'post');
+    }
+
+    /**
+     * Delete email account.
+     * UAPI: Email::delete_pop
+     */
+    public function deleteEmailAccount(string $cpanelUser, string $email): bool
+    {
+        [$localPart, $domain] = array_pad(explode('@', $email, 2), 2, null);
+
+        $result = $this->uapi($cpanelUser, 'Email', 'delete_pop', [
+            'email' => $localPart,
+            'domain' => $domain,
+        ], 'post');
+
+        return $result['success'];
+    }
+
+    /**
+     * Change email account password.
+     * UAPI: Email::passwd_pop
+     *
+     * @return array{success: bool, errors: array, message: string}
+     */
+    public function changeEmailPassword(string $cpanelUser, string $email, string $password): array
+    {
+        [$localPart, $domain] = array_pad(explode('@', $email, 2), 2, null);
+
+        $result = $this->uapi($cpanelUser, 'Email', 'passwd_pop', [
+            'email' => $localPart,
+            'domain' => $domain,
+            'password' => $password,
+        ], 'post');
+
+        return [
+            'success' => $result['success'],
+            'errors' => $result['errors'] ?? [],
+            'message' => $result['errors'][0] ?? ($result['messages'][0] ?? ''),
+        ];
+    }
+
+    /**
+     * Edit email account quota in MB. Pass 0 for unlimited.
+     * UAPI: Email::edit_pop_quota
+     */
+    public function changeEmailQuota(string $cpanelUser, string $email, int $quotaMb): bool
+    {
+        [$localPart, $domain] = array_pad(explode('@', $email, 2), 2, null);
+
+        $result = $this->uapi($cpanelUser, 'Email', 'edit_pop_quota', [
+            'email' => $localPart,
+            'domain' => $domain,
+            'quota' => $quotaMb,
+        ], 'post');
+
+        return $result['success'];
+    }
+
+    /**
+     * Suspend incoming mail OR login for an email account.
+     * UAPI: Email::suspend_incoming / Email::suspend_login
+     *
+     * @param  string  $type  'incoming' or 'login' or 'both'
+     */
+    public function suspendEmailAccount(string $cpanelUser, string $email, string $type = 'both'): bool
+    {
+        [$localPart, $domain] = array_pad(explode('@', $email, 2), 2, null);
+        $params = ['email' => $localPart, 'domain' => $domain];
+
+        $ok = true;
+        if ($type === 'incoming' || $type === 'both') {
+            $ok = $ok && ($this->uapi($cpanelUser, 'Email', 'suspend_incoming', $params, 'post')['success'] ?? false);
+        }
+        if ($type === 'login' || $type === 'both') {
+            $ok = $ok && ($this->uapi($cpanelUser, 'Email', 'suspend_login', $params, 'post')['success'] ?? false);
+        }
+
+        return $ok;
+    }
+
+    public function unsuspendEmailAccount(string $cpanelUser, string $email, string $type = 'both'): bool
+    {
+        [$localPart, $domain] = array_pad(explode('@', $email, 2), 2, null);
+        $params = ['email' => $localPart, 'domain' => $domain];
+
+        $ok = true;
+        if ($type === 'incoming' || $type === 'both') {
+            $ok = $ok && ($this->uapi($cpanelUser, 'Email', 'unsuspend_incoming', $params, 'post')['success'] ?? false);
+        }
+        if ($type === 'login' || $type === 'both') {
+            $ok = $ok && ($this->uapi($cpanelUser, 'Email', 'unsuspend_login', $params, 'post')['success'] ?? false);
+        }
+
+        return $ok;
+    }
+
+    /**
+     * Flush email cache for current instance (call after mutations).
+     */
+    public function flushEmailCache(?string $cpanelUser = null): void
+    {
+        $cpanelUser ??= $this->defaultCpanelUser();
+        if (! $cpanelUser) return;
+
+        $base = 'whm_email_accounts:'.($this->instance ?? 'default').':'.$cpanelUser;
+        Cache::forget($base.':light');
+        Cache::forget($base.':disk');
     }
 
     // ─── Utility ────────────────────────────────────────
