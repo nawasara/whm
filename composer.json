@@ -15,7 +15,8 @@
         "nawasara/ui": "*",
         "nawasara/vault": "*",
         "nawasara/registry": "*",
-        "livewire/livewire": "^3.0"
+        "livewire/livewire": "^3.0",
+        "phpseclib/phpseclib": "^3.0"
     },
     "extra": {
         "laravel": {
