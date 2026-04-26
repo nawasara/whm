@@ -101,7 +101,8 @@ class SshConnection
 
     /**
      * Test the connection — returns true if authenticated, false otherwise.
-     * Does not throw.
+     * Does not throw. Use testConnectionDetail() if you want the failure
+     * reason as a string.
      */
     public function testConnection(): bool
     {
@@ -110,6 +111,29 @@ class SshConnection
             return $ssh->isAuthenticated();
         } catch (\Throwable $e) {
             return false;
+        }
+    }
+
+    /**
+     * Test the connection and return a friendly failure message — null on
+     * success. Used by EximClient::testConnection() to surface the actual
+     * error to the UI instead of a generic "auth failed".
+     */
+    public function testConnectionDetail(): ?string
+    {
+        try {
+            $ssh = $this->connect();
+            return $ssh->isAuthenticated() ? null : 'SSH login berhasil tapi tidak ter-authenticate.';
+        } catch (\Throwable $e) {
+            $msg = $e->getMessage();
+            // Map common phpseclib errors to friendlier Indonesian text.
+            return match (true) {
+                str_contains($msg, 'Cannot connect') => 'Tidak bisa connect ke SSH host. Periksa host/port atau firewall.',
+                str_contains($msg, 'authentication failed') => 'SSH authentication gagal. Pastikan public key sudah dipasang di authorized_keys server.',
+                str_contains($msg, 'Invalid SSH private key') => 'SSH private key tidak valid. Pastikan paste lengkap dengan -----BEGIN/END----- lines.',
+                str_contains($msg, 'not configured') => 'SSH credentials belum di-set di Vault.',
+                default => $msg,
+            };
         }
     }
 

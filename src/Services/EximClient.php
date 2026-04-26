@@ -65,8 +65,9 @@ class EximClient
         }
 
         try {
-            if (! $this->ssh->testConnection()) {
-                return 'SSH authentication gagal — periksa user/key.';
+            $detail = $this->ssh->testConnectionDetail();
+            if ($detail !== null) {
+                return $detail;
             }
 
             // Smoke check: exim version (does not require root for -bV).
