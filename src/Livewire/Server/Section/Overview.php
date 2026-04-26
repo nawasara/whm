@@ -5,10 +5,13 @@ namespace Nawasara\Whm\Livewire\Server\Section;
 use Livewire\Component;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Url;
+use Nawasara\Ui\Livewire\Concerns\HasBrowserToast;
 use Nawasara\Whm\Services\WhmClient;
 
 class Overview extends Component
 {
+    use HasBrowserToast;
+
     #[Url(except: '')]
     public string $server = '';
 
@@ -77,7 +80,7 @@ class Overview extends Component
     {
         $this->client()->flushCache();
         unset($this->status, $this->accountsCount);
-        toaster_success('Server status di-refresh');
+        $this->toastSuccess('Server status di-refresh');
     }
 
     public function render()

@@ -7,11 +7,13 @@ use Livewire\Component;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
+use Nawasara\Ui\Livewire\Concerns\HasBrowserToast;
 use Nawasara\Whm\Livewire\Concerns\HasServerRole;
 use Nawasara\Whm\Services\WhmClient;
 
 class Table extends Component
 {
+    use HasBrowserToast;
     use HasServerRole;
 
     protected function serverRole(): string
@@ -134,10 +136,10 @@ class Table extends Component
         if ($result['success']) {
             $this->client()->flushCache();
             unset($this->packages);
-            toaster_success('Package berhasil dibuat');
+            $this->toastSuccess('Package berhasil dibuat');
             $this->dispatch('modal-close:whm-package-form');
         } else {
-            toaster_error('Gagal membuat package: '.$result['message']);
+            $this->toastError('Gagal membuat package: '.$result['message']);
         }
     }
 
@@ -148,9 +150,9 @@ class Table extends Component
         if ($this->client()->deletePackage($name)) {
             $this->client()->flushCache();
             unset($this->packages);
-            toaster_success("Package {$name} berhasil dihapus");
+            $this->toastSuccess("Package {$name} berhasil dihapus");
         } else {
-            toaster_error("Gagal menghapus package (mungkin masih dipakai akun)");
+            $this->toastError("Gagal menghapus package (mungkin masih dipakai akun)");
         }
     }
 
