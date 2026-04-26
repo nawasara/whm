@@ -8,6 +8,7 @@ use Nawasara\Whm\Livewire\MailLog\Index as MailLogIndex;
 use Nawasara\Whm\Livewire\MailQueue\Index as MailQueueIndex;
 use Nawasara\Whm\Livewire\Package\Index as PackageIndex;
 use Nawasara\Whm\Livewire\Server\Index as ServerIndex;
+use Nawasara\Whm\Livewire\Spam\Index as SpamIndex;
 use Nawasara\Whm\Livewire\Usage\Index as UsageIndex;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 
@@ -39,6 +40,10 @@ Route::middleware(['web', 'auth'])->prefix('nawasara-whm')->group(function () {
     Route::get('email-stats', EmailStatsIndex::class)
         ->middleware(PermissionMiddleware::using('whm.emailstats.view'))
         ->name('nawasara-whm.email-stats.index');
+
+    Route::get('mail-security', SpamIndex::class)
+        ->middleware(PermissionMiddleware::using('whm.spam.view'))
+        ->name('nawasara-whm.spam.index');
 
     Route::get('server', ServerIndex::class)
         ->middleware(PermissionMiddleware::using('whm.server.view'))

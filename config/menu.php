@@ -59,6 +59,13 @@ return [
                 'navigate' => true,
             ],
             [
+                'label' => 'Mail Security',
+                'icon' => 'lucide-shield-x',
+                'url' => url($prefix.'/mail-security'),
+                'permission' => 'whm.spam.view',
+                'navigate' => true,
+            ],
+            [
                 'label' => 'Server Status',
                 'icon' => 'lucide-activity',
                 'url' => url($prefix.'/server'),

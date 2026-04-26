@@ -12,6 +12,7 @@ use Nawasara\Whm\Console\Commands\SyncAccountsCommand;
 use Nawasara\Whm\Console\Commands\SyncEmailsCommand;
 use Nawasara\Whm\Services\EmailStatsAggregator;
 use Nawasara\Whm\Services\EximClient;
+use Nawasara\Whm\Services\MailSecurityAggregator;
 use Nawasara\Whm\Services\SshConnection;
 use Nawasara\Whm\Services\WhmClient;
 
@@ -67,6 +68,7 @@ class WhmServiceProvider extends ServiceProvider
         $this->app->singleton(SshConnection::class, fn () => new SshConnection());
         $this->app->singleton(EximClient::class, fn ($app) => new EximClient($app->make(SshConnection::class)));
         $this->app->singleton(EmailStatsAggregator::class, fn ($app) => new EmailStatsAggregator($app->make(SshConnection::class)));
+        $this->app->singleton(MailSecurityAggregator::class, fn ($app) => new MailSecurityAggregator($app->make(SshConnection::class)));
     }
 
     public function registerLivewire(): void
