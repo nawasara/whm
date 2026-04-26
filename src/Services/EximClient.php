@@ -22,8 +22,10 @@ class EximClient
 
     protected ?string $instance = null;
 
-    public function __construct(protected SshConnection $ssh)
-    {
+    public function __construct(
+        protected SshConnection $ssh,
+        protected EximLogParser $parser = new EximLogParser(),
+    ) {
     }
 
     public function forInstance(?string $instance): static
@@ -32,6 +34,11 @@ class EximClient
         $clone->instance = $instance ?: null;
         $clone->ssh = $this->ssh->forInstance($instance);
         return $clone;
+    }
+
+    public function parser(): EximLogParser
+    {
+        return $this->parser;
     }
 
     public function instance(): ?string
@@ -120,6 +127,117 @@ class EximClient
             return trim(strtok($output, "\n")) ?: null;
         } catch (\Throwable $e) {
             return null;
+        }
+    }
+
+    /**
+     * Full Exim queue listing, parsed into structured items.
+     *
+     * @return array<int, array<string, mixed>>  see EximLogParser::parseQueue
+     */
+    public function getQueue(): array
+    {
+        $output = $this->ssh->exec('exim -bp 2>/dev/null');
+        return $this->parser->parseQueue($output);
+    }
+
+    /**
+     * Remove a single message from the queue.
+     */
+    public function deleteFromQueue(string $messageId): bool
+    {
+        $this->assertValidMessageId($messageId);
+        $result = $this->ssh->execWithStatus('exim -Mrm '.escapeshellarg($messageId).' 2>&1');
+        return $result['exit_status'] === 0;
+    }
+
+    /**
+     * Bulk remove. Returns number of messages successfully removed.
+     */
+    public function deleteManyFromQueue(array $messageIds): int
+    {
+        if (empty($messageIds)) {
+            return 0;
+        }
+
+        $valid = array_filter($messageIds, fn ($id) => $this->isValidMessageId($id));
+        if (empty($valid)) {
+            return 0;
+        }
+
+        $args = implode(' ', array_map('escapeshellarg', $valid));
+        $result = $this->ssh->execWithStatus('exim -Mrm '.$args.' 2>&1');
+        return $result['exit_status'] === 0 ? count($valid) : 0;
+    }
+
+    public function freeze(string $messageId): bool
+    {
+        $this->assertValidMessageId($messageId);
+        $result = $this->ssh->execWithStatus('exim -Mf '.escapeshellarg($messageId).' 2>&1');
+        return $result['exit_status'] === 0;
+    }
+
+    public function thaw(string $messageId): bool
+    {
+        $this->assertValidMessageId($messageId);
+        $result = $this->ssh->execWithStatus('exim -Mt '.escapeshellarg($messageId).' 2>&1');
+        return $result['exit_status'] === 0;
+    }
+
+    /**
+     * Force delivery attempt now (non-blocking on the server).
+     */
+    public function forceDelivery(string $messageId): bool
+    {
+        $this->assertValidMessageId($messageId);
+        $result = $this->ssh->execWithStatus('exim -M '.escapeshellarg($messageId).' 2>&1');
+        return $result['exit_status'] === 0;
+    }
+
+    /**
+     * Flush the entire queue (fire delivery attempts for all queued messages).
+     */
+    public function flushQueue(): bool
+    {
+        $result = $this->ssh->execWithStatus('exim -qff 2>&1');
+        return $result['exit_status'] === 0;
+    }
+
+    /**
+     * Full message headers (from -Mvh).
+     */
+    public function messageHeaders(string $messageId): string
+    {
+        $this->assertValidMessageId($messageId);
+        return $this->ssh->exec('exim -Mvh '.escapeshellarg($messageId).' 2>/dev/null');
+    }
+
+    /**
+     * Message body, truncated to N lines.
+     */
+    public function messageBody(string $messageId, int $maxLines = 100): string
+    {
+        $this->assertValidMessageId($messageId);
+        $maxLines = max(10, min($maxLines, 1000));
+        return $this->ssh->exec('exim -Mvb '.escapeshellarg($messageId).' 2>/dev/null | head -n '.$maxLines);
+    }
+
+    /**
+     * Defensive — Exim message IDs match a fixed shape. Reject anything else
+     * to keep injected commands out of the SSH pipe even though we already
+     * shell-escape arguments.
+     */
+    protected function isValidMessageId(string $id): bool
+    {
+        // Exim 4 message IDs: XXXXXX-XXXXXX-XX (older, 16 chars total) or
+        // XXXXXX-XXXXXXXXXXX-XXXX (newer wide ids on cPanel ~24 chars).
+        return (bool) preg_match('/^[A-Za-z0-9]{6}-[A-Za-z0-9]{6,}-[A-Za-z0-9]{2,}$/', $id);
+    }
+
+    protected function assertValidMessageId(string $id): void
+    {
+        if (! $this->isValidMessageId($id)) {
+            throw new \InvalidArgumentException("Invalid Exim message ID: {$id}");
         }
     }
 }

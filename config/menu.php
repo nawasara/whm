@@ -38,6 +38,13 @@ return [
                 'navigate' => true,
             ],
             [
+                'label' => 'Mail Queue',
+                'icon' => 'lucide-inbox',
+                'url' => url($prefix.'/mail-queue'),
+                'permission' => 'whm.mailqueue.view',
+                'navigate' => true,
+            ],
+            [
                 'label' => 'Server Status',
                 'icon' => 'lucide-activity',
                 'url' => url($prefix.'/server'),
