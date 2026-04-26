@@ -76,6 +76,10 @@
                 <div>
                     <x-nawasara-ui::form.label value="Limit Hasil (max 5000)" />
                     <x-nawasara-ui::form.input type="number" wire:model="limit" min="10" max="5000" />
+                    <label class="flex items-center gap-2 mt-2 text-xs text-gray-600 dark:text-neutral-400 cursor-pointer">
+                        <input type="checkbox" wire:model="hideNoise" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:bg-neutral-800 dark:border-neutral-600">
+                        Sembunyikan noise (event tanpa msg id: connection log, auth fail)
+                    </label>
                 </div>
                 <div class="flex items-end gap-2">
                     <x-nawasara-ui::button type="submit" color="primary">

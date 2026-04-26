@@ -31,6 +31,7 @@ class Search extends Component
     public string $recipient = '';
     public string $messageId = '';
     public string $status = '';
+    public bool $hideNoise = true; // hide background SMTP/connection events
     public int $limit = 200;
 
     /** Last successful query result. */
@@ -107,7 +108,7 @@ class Search extends Component
         $this->errorMessage = null;
 
         try {
-            $this->results = $this->client()->searchLog([
+            $entries = $this->client()->searchLog([
                 'date_from' => $this->dateFrom ?: null,
                 'date_to' => $this->dateTo ?: null,
                 'sender' => $this->sender ?: null,
@@ -116,6 +117,17 @@ class Search extends Component
                 'status' => $this->status ?: null,
                 'limit' => $this->limit,
             ]);
+
+            // Hide noise = drop entries that have no message_id (background
+            // events like "no host name found", "SMTP connection from",
+            // dovecot auth fails, command echo). Those are useful for the
+            // ops team but cluttered the table for the typical "did this
+            // email get delivered?" use case.
+            if ($this->hideNoise && ! $this->status) {
+                $entries = array_values(array_filter($entries, fn ($e) => ! empty($e['message_id'])));
+            }
+
+            $this->results = $entries;
             $this->hasSearched = true;
             $this->elapsedMs = round((microtime(true) - $start) * 1000, 1);
 
@@ -137,6 +149,7 @@ class Search extends Component
         $this->dateFrom = now()->format('Y-m-d');
         $this->dateTo = now()->format('Y-m-d');
         $this->limit = 200;
+        $this->hideNoise = true;
     }
 
     public function setQuickRange(string $range): void
