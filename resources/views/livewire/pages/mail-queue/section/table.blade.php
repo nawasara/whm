@@ -141,6 +141,12 @@
                                 <div class="text-xs text-red-600 dark:text-red-400 mt-0.5 truncate max-w-md" title="{{ $item['last_error'] }}">
                                     {{ \Illuminate\Support\Str::limit($item['last_error'], 80) }}
                                 </div>
+                            @elseif ($item['age_seconds'] > 86400 && $item['status'] !== 'frozen')
+                                <button type="button" wire:click="openDetail('{{ $item['id'] }}')"
+                                    class="text-xs text-yellow-600 dark:text-yellow-400 mt-0.5 hover:underline inline-flex items-center gap-1">
+                                    <x-lucide-alert-circle class="size-3" />
+                                    Stuck >24h — lihat delivery log
+                                </button>
                             @endif
                         </td>
                         <td class="px-6 py-3 whitespace-nowrap text-sm text-right">
@@ -150,6 +156,7 @@
                                 $item['status'] === 'frozen'
                                     ? ['type' => 'click', 'label' => 'Thaw', 'wire:click' => 'thawOne(\''.$item['id'].'\')', 'icon' => 'lucide-sun', 'permission' => 'whm.mailqueue.manage']
                                     : ['type' => 'click', 'label' => 'Freeze', 'wire:click' => 'freezeOne(\''.$item['id'].'\')', 'icon' => 'lucide-snowflake', 'permission' => 'whm.mailqueue.manage'],
+                                ['type' => 'click', 'label' => 'Bounce ke Sender', 'wire:click' => 'bounceOne(\''.$item['id'].'\')', 'icon' => 'lucide-undo-2', 'confirm' => 'Bounce message? Sender akan dapat email "delivery failed".', 'permission' => 'whm.mailqueue.manage'],
                                 ['type' => 'click', 'label' => 'Delete', 'wire:click' => 'deleteOne(\''.$item['id'].'\')', 'icon' => 'lucide-trash-2', 'confirm' => 'Hapus message ini dari queue?', 'permission' => 'whm.mailqueue.manage'],
                             ]" />
                         </td>
@@ -189,22 +196,48 @@
     {{-- Detail Modal --}}
     <x-nawasara-ui::modal id="whm-mailqueue-detail" maxWidth="3xl" :title="'Message: '.($detailId ?? '')">
         @if ($detailId)
-            <div class="space-y-4 text-sm">
-                <div>
-                    <h4 class="font-semibold text-gray-700 dark:text-neutral-300 mb-2 flex items-center gap-2">
-                        <x-lucide-mail class="size-4" /> Headers
-                    </h4>
-                    <pre class="text-xs bg-gray-50 dark:bg-neutral-900 p-3 rounded border border-gray-200 dark:border-neutral-700 overflow-x-auto whitespace-pre-wrap font-mono text-gray-800 dark:text-neutral-200 max-h-80">{{ $detailHeaders ?? '(empty)' }}</pre>
-                </div>
-                <div>
-                    <h4 class="font-semibold text-gray-700 dark:text-neutral-300 mb-2 flex items-center gap-2">
-                        <x-lucide-file-text class="size-4" /> Body Preview (max 100 lines)
-                    </h4>
-                    <pre class="text-xs bg-gray-50 dark:bg-neutral-900 p-3 rounded border border-gray-200 dark:border-neutral-700 overflow-x-auto whitespace-pre-wrap font-mono text-gray-800 dark:text-neutral-200 max-h-96">{{ $detailBody ?? '(empty)' }}</pre>
-                </div>
+            {{-- Tab nav --}}
+            <div class="border-b border-gray-200 dark:border-neutral-700 mb-3">
+                <nav class="flex -mb-px gap-4 text-sm" aria-label="Tabs">
+                    <button type="button" wire:click="setDetailTab('log')"
+                        class="py-2 px-1 border-b-2 font-medium {{ $detailTab === 'log' ? 'border-blue-600 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-neutral-400 dark:hover:text-neutral-300' }}">
+                        <x-lucide-activity class="size-4 inline -mt-0.5" /> Delivery Log
+                    </button>
+                    <button type="button" wire:click="setDetailTab('headers')"
+                        class="py-2 px-1 border-b-2 font-medium {{ $detailTab === 'headers' ? 'border-blue-600 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-neutral-400 dark:hover:text-neutral-300' }}">
+                        <x-lucide-mail class="size-4 inline -mt-0.5" /> Headers
+                    </button>
+                    <button type="button" wire:click="setDetailTab('body')"
+                        class="py-2 px-1 border-b-2 font-medium {{ $detailTab === 'body' ? 'border-blue-600 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-neutral-400 dark:hover:text-neutral-300' }}">
+                        <x-lucide-file-text class="size-4 inline -mt-0.5" /> Body Preview
+                    </button>
+                </nav>
+            </div>
+
+            <div class="text-sm">
+                @if ($detailTab === 'log')
+                    <p class="text-xs text-gray-500 dark:text-neutral-400 mb-2">
+                        Setiap delivery attempt yang Exim sudah lakukan untuk message ini, termasuk SMTP response dari remote server.
+                        Cara terbaik melihat <em>kenapa</em> message stuck.
+                    </p>
+                    <pre class="text-xs bg-gray-50 dark:bg-neutral-900 p-3 rounded border border-gray-200 dark:border-neutral-700 overflow-x-auto whitespace-pre-wrap font-mono text-gray-800 dark:text-neutral-200 max-h-[28rem]">{{ trim($detailLog ?? '') ?: '(belum ada delivery attempt yang ter-log)' }}</pre>
+                @elseif ($detailTab === 'headers')
+                    <pre class="text-xs bg-gray-50 dark:bg-neutral-900 p-3 rounded border border-gray-200 dark:border-neutral-700 overflow-x-auto whitespace-pre-wrap font-mono text-gray-800 dark:text-neutral-200 max-h-[28rem]">{{ $detailHeaders ?? '(empty)' }}</pre>
+                @else
+                    <p class="text-xs text-gray-500 dark:text-neutral-400 mb-2">Body preview (maksimal 100 baris pertama).</p>
+                    <pre class="text-xs bg-gray-50 dark:bg-neutral-900 p-3 rounded border border-gray-200 dark:border-neutral-700 overflow-x-auto whitespace-pre-wrap font-mono text-gray-800 dark:text-neutral-200 max-h-[28rem]">{{ $detailBody ?? '(empty)' }}</pre>
+                @endif
             </div>
         @endif
         <x-slot:footer>
+            @can('whm.mailqueue.manage')
+                @if ($detailId)
+                    <x-nawasara-ui::button color="warning" variant="outline" wire:click="bounceOne('{{ $detailId }}')" wire:confirm="Bounce message? Sender akan dapat email 'delivery failed'.">
+                        <x-slot:icon><x-lucide-undo-2 /></x-slot:icon>
+                        Bounce ke Sender
+                    </x-nawasara-ui::button>
+                @endif
+            @endcan
             <x-nawasara-ui::button color="neutral" variant="outline" wire:click="closeDetail">Tutup</x-nawasara-ui::button>
         </x-slot:footer>
     </x-nawasara-ui::modal>

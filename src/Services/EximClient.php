@@ -204,6 +204,29 @@ class EximClient
     }
 
     /**
+     * Give up retrying and bounce the message back to its sender.
+     * Polite alternative to deleteFromQueue when delivery is permanently
+     * failing — the sender gets a "delivery failed" notice.
+     */
+    public function bounce(string $messageId): bool
+    {
+        $this->assertValidMessageId($messageId);
+        $result = $this->ssh->execWithStatus('exim -Mg '.escapeshellarg($messageId).' 2>&1');
+        return $result['exit_status'] === 0;
+    }
+
+    /**
+     * Per-message delivery log (exim -Mvl). Shows every attempt with
+     * timestamp, MX hit, and SMTP response — gold for diagnosing why a
+     * message is stuck (mailbox full, user unknown, RBL block, etc.).
+     */
+    public function messageDeliveryLog(string $messageId): string
+    {
+        $this->assertValidMessageId($messageId);
+        return $this->ssh->exec('exim -Mvl '.escapeshellarg($messageId).' 2>/dev/null');
+    }
+
+    /**
      * Full message headers (from -Mvh).
      */
     public function messageHeaders(string $messageId): string

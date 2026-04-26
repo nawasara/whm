@@ -38,6 +38,8 @@ class Table extends Component
     public ?string $detailId = null;
     public ?string $detailHeaders = null;
     public ?string $detailBody = null;
+    public ?string $detailLog = null;
+    public string $detailTab = 'log'; // 'log' | 'headers' | 'body'
 
     protected WhmClient $whm;
     protected EximClient $exim;
@@ -198,6 +200,8 @@ class Table extends Component
 
         try {
             $this->detailId = $messageId;
+            $this->detailTab = 'log';
+            $this->detailLog = $this->client()->messageDeliveryLog($messageId);
             $this->detailHeaders = $this->client()->messageHeaders($messageId);
             $this->detailBody = $this->client()->messageBody($messageId, 100);
             $this->dispatch('modal-open:whm-mailqueue-detail');
@@ -206,11 +210,17 @@ class Table extends Component
         }
     }
 
+    public function setDetailTab(string $tab): void
+    {
+        $this->detailTab = in_array($tab, ['log', 'headers', 'body'], true) ? $tab : 'log';
+    }
+
     public function closeDetail(): void
     {
         $this->detailId = null;
         $this->detailHeaders = null;
         $this->detailBody = null;
+        $this->detailLog = null;
         $this->dispatch('modal-close:whm-mailqueue-detail');
     }
 
@@ -270,10 +280,26 @@ class Table extends Component
 
         try {
             if ($this->client()->forceDelivery($messageId)) {
-                $this->toastSuccess("Force delivery dispatched untuk {$messageId}.");
+                $this->toastSuccess("Force delivery dispatched untuk {$messageId}. Cek detail untuk lihat hasil attempt-nya.");
                 $this->refresh();
             } else {
                 $this->toastError("Gagal force delivery {$messageId}.");
+            }
+        } catch (\Throwable $e) {
+            $this->toastError($e->getMessage());
+        }
+    }
+
+    public function bounceOne(string $messageId): void
+    {
+        Gate::authorize('whm.mailqueue.manage');
+
+        try {
+            if ($this->client()->bounce($messageId)) {
+                $this->toastSuccess("Message {$messageId} di-bounce — sender mendapat notice delivery failed.");
+                $this->refresh();
+            } else {
+                $this->toastError("Gagal bounce {$messageId}.");
             }
         } catch (\Throwable $e) {
             $this->toastError($e->getMessage());
