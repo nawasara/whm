@@ -227,6 +227,149 @@ class EximClient
     }
 
     /**
+     * Search the Exim mainlog with filters, returning parsed log entries.
+     *
+     * Strategy: build a `grep` pipeline on the server so we never transfer
+     * the full log file (it can be GB-sized). Date filter is anchored to
+     * the line prefix (`YYYY-MM-DD`). Other filters are passed as additional
+     * `grep -i` stages.
+     *
+     * @param array{
+     *   date_from?: string,   // YYYY-MM-DD
+     *   date_to?: string,     // YYYY-MM-DD
+     *   sender?: string,
+     *   recipient?: string,
+     *   message_id?: string,
+     *   status?: string,      // 'received'|'delivered'|'bounced'|'deferred'
+     *   limit?: int,          // default 500, max 5000
+     *   path?: string,        // override mainlog path
+     * } $filters
+     * @return array<int, array<string, mixed>>  parsed log entries (newest first)
+     */
+    public function searchLog(array $filters = []): array
+    {
+        $limit = (int) ($filters['limit'] ?? 500);
+        $limit = max(1, min($limit, 5000));
+
+        $path = escapeshellarg($filters['path'] ?? self::DEFAULT_MAINLOG);
+
+        // Build pipeline. Start with date-range awk if both dates given,
+        // else cat the file. Then apply progressive grep filters.
+        $pipeline = [];
+
+        $dateFrom = $filters['date_from'] ?? null;
+        $dateTo = $filters['date_to'] ?? null;
+
+        if ($dateFrom && $dateTo && $this->isValidDate($dateFrom) && $this->isValidDate($dateTo)) {
+            // awk range filter — efficient single-pass
+            $pipeline[] = sprintf(
+                "awk '$1 >= %s && $1 <= %s' %s",
+                escapeshellarg($dateFrom),
+                escapeshellarg($dateTo),
+                $path,
+            );
+        } elseif ($dateFrom && $this->isValidDate($dateFrom)) {
+            $pipeline[] = sprintf("awk '$1 >= %s' %s", escapeshellarg($dateFrom), $path);
+        } elseif ($dateTo && $this->isValidDate($dateTo)) {
+            $pipeline[] = sprintf("awk '$1 <= %s' %s", escapeshellarg($dateTo), $path);
+        } else {
+            $pipeline[] = sprintf('cat %s', $path);
+        }
+
+        foreach (['sender', 'recipient', 'message_id'] as $key) {
+            $value = trim($filters[$key] ?? '');
+            if ($value === '') {
+                continue;
+            }
+            // Reject anything with shell metacharacters — only grep-friendly text allowed
+            if (preg_match('/[\\\\$`\n\r;|&<>]/', $value)) {
+                throw new \InvalidArgumentException("Invalid characters in {$key} filter");
+            }
+            $pipeline[] = 'grep -F -i '.escapeshellarg($value);
+        }
+
+        $status = $filters['status'] ?? '';
+        $statusGrep = $this->statusToGrepPattern($status);
+        if ($statusGrep !== null) {
+            $pipeline[] = 'grep -F '.escapeshellarg($statusGrep);
+        }
+
+        // Take last N matches (newest first after reverse).
+        $pipeline[] = "tail -n {$limit}";
+
+        $cmd = implode(' | ', $pipeline).' 2>/dev/null';
+
+        $output = $this->ssh->withTimeout(60)->exec($cmd);
+
+        $lines = preg_split('/\r?\n/', trim($output));
+        if ($lines === false) {
+            return [];
+        }
+
+        // Newest first
+        $lines = array_reverse(array_filter($lines, fn ($l) => $l !== ''));
+
+        $entries = [];
+        foreach ($lines as $line) {
+            $parsed = $this->parser->parseLogLine($line);
+            if ($parsed) {
+                $entries[] = $parsed + ['raw' => $line];
+            }
+        }
+
+        return $entries;
+    }
+
+    /**
+     * Trace all log events for a single message id (receive → routing →
+     * deliver/bounce/defer). Useful for "what happened to this email?".
+     *
+     * @return array<int, array<string, mixed>>  parsed events (oldest first)
+     */
+    public function traceMessage(string $messageId): array
+    {
+        $this->assertValidMessageId($messageId);
+
+        $path = escapeshellarg(self::DEFAULT_MAINLOG);
+        $cmd = sprintf('grep -F %s %s 2>/dev/null', escapeshellarg($messageId), $path);
+
+        $output = $this->ssh->withTimeout(60)->exec($cmd);
+
+        $entries = [];
+        foreach (preg_split('/\r?\n/', trim($output)) as $line) {
+            if ($line === '') {
+                continue;
+            }
+            $parsed = $this->parser->parseLogLine($line);
+            if ($parsed) {
+                $entries[] = $parsed + ['raw' => $line];
+            }
+        }
+
+        return $entries;
+    }
+
+    protected function isValidDate(string $date): bool
+    {
+        return (bool) preg_match('/^\d{4}-\d{2}-\d{2}$/', $date);
+    }
+
+    /**
+     * Map a UI status filter to the substring grep pattern that uniquely
+     * identifies that event in an Exim log line.
+     */
+    protected function statusToGrepPattern(string $status): ?string
+    {
+        return match ($status) {
+            'received' => ' <= ',
+            'delivered' => ' => ',
+            'bounced' => ' ** ',
+            'deferred' => ' == ',
+            default => null,
+        };
+    }
+
+    /**
      * Full message headers (from -Mvh).
      */
     public function messageHeaders(string $messageId): string

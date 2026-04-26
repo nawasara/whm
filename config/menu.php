@@ -45,6 +45,13 @@ return [
                 'navigate' => true,
             ],
             [
+                'label' => 'Mail Log',
+                'icon' => 'lucide-scroll-text',
+                'url' => url($prefix.'/mail-log'),
+                'permission' => 'whm.maillog.view',
+                'navigate' => true,
+            ],
+            [
                 'label' => 'Server Status',
                 'icon' => 'lucide-activity',
                 'url' => url($prefix.'/server'),
