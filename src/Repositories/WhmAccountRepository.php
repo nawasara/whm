@@ -6,6 +6,7 @@ use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use Nawasara\Sync\Concerns\TracksLastSync;
 use Nawasara\Sync\Contracts\SyncedRepository;
 use Nawasara\Sync\Models\SyncJob;
 use Nawasara\Whm\Jobs\Account\ChangeWhmAccountPackageJob;
@@ -19,6 +20,8 @@ use Nawasara\Whm\Models\WhmAccount;
 
 class WhmAccountRepository implements SyncedRepository
 {
+    use TracksLastSync;
+
     public function __construct(public ?string $instance = null)
     {
     }
@@ -143,12 +146,7 @@ class WhmAccountRepository implements SyncedRepository
 
     public function lastSyncedAt(): ?Carbon
     {
-        $latest = WhmAccount::forInstance($this->instance)
-            ->whereNotNull('last_synced_at')
-            ->orderByDesc('last_synced_at')
-            ->value('last_synced_at');
-
-        return $latest ? Carbon::parse($latest) : null;
+        return $this->lastSuccessfulSyncAt('whm', 'sync_accounts');
     }
 
     protected function query(array $filters = [])

@@ -6,6 +6,7 @@ use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use Nawasara\Sync\Concerns\TracksLastSync;
 use Nawasara\Sync\Contracts\SyncedRepository;
 use Nawasara\Sync\Models\SyncJob;
 use Nawasara\Whm\Jobs\Email\ChangeWhmEmailPasswordJob;
@@ -19,6 +20,8 @@ use Nawasara\Whm\Models\WhmEmailAccount;
 
 class WhmEmailAccountRepository implements SyncedRepository
 {
+    use TracksLastSync;
+
     public function __construct(public ?string $instance = null)
     {
     }
@@ -151,12 +154,7 @@ class WhmEmailAccountRepository implements SyncedRepository
 
     public function lastSyncedAt(): ?Carbon
     {
-        $latest = WhmEmailAccount::forInstance($this->instance)
-            ->whereNotNull('last_synced_at')
-            ->orderByDesc('last_synced_at')
-            ->value('last_synced_at');
-
-        return $latest ? Carbon::parse($latest) : null;
+        return $this->lastSuccessfulSyncAt('whm', 'sync_emails');
     }
 
     /** Build base query dengan filter umum */
