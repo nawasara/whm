@@ -156,7 +156,7 @@
                                 $item['status'] === 'frozen'
                                     ? ['type' => 'click', 'label' => 'Thaw', 'wire:click' => 'thawOne(\''.$item['id'].'\')', 'icon' => 'lucide-sun', 'permission' => 'whm.mailqueue.manage']
                                     : ['type' => 'click', 'label' => 'Freeze', 'wire:click' => 'freezeOne(\''.$item['id'].'\')', 'icon' => 'lucide-snowflake', 'permission' => 'whm.mailqueue.manage'],
-                                ['type' => 'click', 'label' => 'Bounce ke Sender', 'wire:click' => 'bounceOne(\''.$item['id'].'\')', 'icon' => 'lucide-undo-2', 'confirm' => 'Bounce message? Sender akan dapat email "delivery failed".', 'permission' => 'whm.mailqueue.manage'],
+                                ['type' => 'click', 'label' => 'Bounce ke Sender', 'wire:click' => 'bounceOne(\''.$item['id'].'\')', 'icon' => 'lucide-undo-2', 'confirm' => 'Bounce message? Sender akan dapat notice delivery failed.', 'permission' => 'whm.mailqueue.manage'],
                                 ['type' => 'click', 'label' => 'Delete', 'wire:click' => 'deleteOne(\''.$item['id'].'\')', 'icon' => 'lucide-trash-2', 'confirm' => 'Hapus message ini dari queue?', 'permission' => 'whm.mailqueue.manage'],
                             ]" />
                         </td>
@@ -232,7 +232,7 @@
         <x-slot:footer>
             @can('whm.mailqueue.manage')
                 @if ($detailId)
-                    <x-nawasara-ui::button color="warning" variant="outline" wire:click="bounceOne('{{ $detailId }}')" wire:confirm="Bounce message? Sender akan dapat email 'delivery failed'.">
+                    <x-nawasara-ui::button color="warning" variant="outline" wire:click="bounceOne('{{ $detailId }}')" wire:confirm="Bounce message? Sender akan dapat notice delivery failed.">
                         <x-slot:icon><x-lucide-undo-2 /></x-slot:icon>
                         Bounce ke Sender
                     </x-nawasara-ui::button>
