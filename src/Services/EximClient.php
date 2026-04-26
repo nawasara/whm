@@ -108,8 +108,16 @@ class EximClient
     public function version(): ?string
     {
         try {
-            $output = trim($this->ssh->exec('exim -bV 2>&1 | head -1'));
-            return $output ?: null;
+            // Some servers log every command (cwd= log lines), so head -1 may
+            // pick the log echo instead of the actual version. Filter for the
+            // line that mentions "version" (case-insensitive).
+            $output = $this->ssh->exec('exim -bV 2>&1');
+            foreach (preg_split('/\r?\n/', $output) as $line) {
+                if (stripos($line, 'version') !== false) {
+                    return trim($line);
+                }
+            }
+            return trim(strtok($output, "\n")) ?: null;
         } catch (\Throwable $e) {
             return null;
         }
