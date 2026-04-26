@@ -52,6 +52,13 @@ return [
                 'navigate' => true,
             ],
             [
+                'label' => 'Email Stats',
+                'icon' => 'lucide-bar-chart-3',
+                'url' => url($prefix.'/email-stats'),
+                'permission' => 'whm.emailstats.view',
+                'navigate' => true,
+            ],
+            [
                 'label' => 'Server Status',
                 'icon' => 'lucide-activity',
                 'url' => url($prefix.'/server'),

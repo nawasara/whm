@@ -10,6 +10,7 @@ use Symfony\Component\Finder\Finder;
 use Illuminate\Support\ServiceProvider;
 use Nawasara\Whm\Console\Commands\SyncAccountsCommand;
 use Nawasara\Whm\Console\Commands\SyncEmailsCommand;
+use Nawasara\Whm\Services\EmailStatsAggregator;
 use Nawasara\Whm\Services\EximClient;
 use Nawasara\Whm\Services\SshConnection;
 use Nawasara\Whm\Services\WhmClient;
@@ -65,6 +66,7 @@ class WhmServiceProvider extends ServiceProvider
         $this->app->singleton(WhmClient::class, fn () => new WhmClient());
         $this->app->singleton(SshConnection::class, fn () => new SshConnection());
         $this->app->singleton(EximClient::class, fn ($app) => new EximClient($app->make(SshConnection::class)));
+        $this->app->singleton(EmailStatsAggregator::class, fn ($app) => new EmailStatsAggregator($app->make(SshConnection::class)));
     }
 
     public function registerLivewire(): void
