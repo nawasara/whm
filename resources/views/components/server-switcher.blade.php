@@ -38,7 +38,7 @@
         <x-lucide-server class="size-4 text-gray-500 dark:text-neutral-400" />
         <span class="font-medium text-gray-700 dark:text-neutral-300">{{ $only }}</span>
         @if ($role)
-            <span class="px-1.5 py-0.5 rounded text-xs font-medium {{ $role === 'mail' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' : ($role === 'hosting' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' : 'bg-gray-100 text-gray-700 dark:bg-neutral-700 dark:text-neutral-400') }}">
+            <span class="px-1.5 py-0.5 rounded text-xs font-medium {{ $role === 'mail' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' : ($role === 'hosting' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-700 dark:bg-neutral-700 dark:text-neutral-400') }}">
                 {{ $role }}
             </span>
         @endif

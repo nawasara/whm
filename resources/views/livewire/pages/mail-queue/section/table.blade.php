@@ -1,4 +1,4 @@
-<div>
+<div wire:init="loadQueue">
     @if (! count($this->servers))
         <div class="text-center py-12 border-2 border-dashed border-gray-200 dark:border-neutral-700 rounded-xl">
             <x-lucide-inbox class="size-12 mx-auto text-gray-300 dark:text-neutral-600" />
@@ -17,6 +17,18 @@
                 dan isi field SSH (user, port, private key).
             </p>
         </div>
+    @elseif (! $loaded)
+        <div class="mb-3 flex items-center gap-3">
+            <x-nawasara-ui::skeleton width="40" height="3" />
+            <x-nawasara-ui::skeleton width="20" height="3" />
+            <x-nawasara-ui::skeleton width="20" height="3" />
+        </div>
+        <div class="mb-3 flex items-center gap-2">
+            <x-nawasara-ui::skeleton width="48" height="9" rounded="lg" />
+            <x-nawasara-ui::skeleton width="32" height="9" rounded="lg" />
+            <x-nawasara-ui::skeleton width="32" height="9" rounded="lg" />
+        </div>
+        <x-nawasara-ui::skeleton-table :rows="5" :cols="6" />
     @else
         {{-- Status summary bar --}}
         <div class="mb-3 flex items-center justify-between text-xs text-gray-500 dark:text-neutral-400">

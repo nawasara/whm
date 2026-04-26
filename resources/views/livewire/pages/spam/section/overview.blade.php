@@ -1,4 +1,4 @@
-<div wire:poll.60s>
+<div wire:poll.60s wire:init="loadStats">
     @if (! count($this->servers))
         <div class="text-center py-12 border-2 border-dashed border-gray-200 dark:border-neutral-700 rounded-xl">
             <x-lucide-shield-x class="size-12 mx-auto text-gray-300 dark:text-neutral-600" />
@@ -27,6 +27,25 @@
             </x-nawasara-ui::button>
         </div>
 
+        @if (! $loaded)
+            <h2 class="text-base font-semibold text-gray-900 dark:text-white mb-3">Rejected Hari Ini ({{ now()->format('d M Y') }})</h2>
+            <x-nawasara-ui::skeleton-stats :cards="6" :cols="6" />
+            <div class="my-6 p-5 rounded-xl border border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
+                <x-nawasara-ui::skeleton width="40" height="5" class="mb-4" />
+                <x-nawasara-ui::skeleton class="w-full" height="40" />
+            </div>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+                @for ($i = 0; $i < 2; $i++)
+                    <div class="p-5 rounded-xl border border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 space-y-3">
+                        <x-nawasara-ui::skeleton width="40" height="4" />
+                        @for ($j = 0; $j < 5; $j++)
+                            <x-nawasara-ui::skeleton class="w-full" height="3" />
+                        @endfor
+                    </div>
+                @endfor
+            </div>
+            <x-nawasara-ui::skeleton-table :rows="6" :cols="5" />
+        @else
         {{-- Today's stats cards --}}
         <h2 class="text-base font-semibold text-gray-900 dark:text-white mb-3">Rejected Hari Ini ({{ now()->format('d M Y') }})</h2>
         <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
@@ -34,17 +53,15 @@
                 $cards = [
                     ['label' => 'Total', 'value' => $this->todayCounts['total'], 'color' => 'gray', 'icon' => 'lucide-shield-x'],
                     ['label' => 'Auth Fail', 'value' => $this->todayCounts['auth_fail'], 'color' => 'red', 'icon' => 'lucide-key-round'],
-                    ['label' => 'RBL Block', 'value' => $this->todayCounts['rbl'], 'color' => 'purple', 'icon' => 'lucide-list-x'],
+                    ['label' => 'RBL Block', 'value' => $this->todayCounts['rbl'], 'color' => 'red', 'icon' => 'lucide-list-x'],
                     ['label' => 'Unknown User', 'value' => $this->todayCounts['unknown_user'], 'color' => 'yellow', 'icon' => 'lucide-user-x'],
-                    ['label' => 'Spam', 'value' => $this->todayCounts['spam'], 'color' => 'orange', 'icon' => 'lucide-shield-alert'],
-                    ['label' => 'Other', 'value' => $this->todayCounts['other'], 'color' => 'blue', 'icon' => 'lucide-circle-help'],
+                    ['label' => 'Spam', 'value' => $this->todayCounts['spam'], 'color' => 'red', 'icon' => 'lucide-shield-alert'],
+                    ['label' => 'Other', 'value' => $this->todayCounts['other'], 'color' => 'gray', 'icon' => 'lucide-circle-help'],
                 ];
                 $colorMap = [
                     'gray' => 'bg-gray-50 text-gray-700 dark:bg-neutral-800 dark:text-neutral-300 border-gray-200 dark:border-neutral-700',
                     'red' => 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400 border-red-200 dark:border-red-800',
-                    'purple' => 'bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400 border-purple-200 dark:border-purple-800',
                     'yellow' => 'bg-yellow-50 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800',
-                    'orange' => 'bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400 border-orange-200 dark:border-orange-800',
                     'blue' => 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400 border-blue-200 dark:border-blue-800',
                 ];
             @endphp
@@ -204,5 +221,6 @@
                 </div>
             @endif
         </div>
+        @endif
     @endif
 </div>

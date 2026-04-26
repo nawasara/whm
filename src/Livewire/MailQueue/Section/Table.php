@@ -41,6 +41,8 @@ class Table extends Component
     public ?string $detailLog = null;
     public string $detailTab = 'log'; // 'log' | 'headers' | 'body'
 
+    public bool $loaded = false;
+
     protected WhmClient $whm;
     protected EximClient $exim;
 
@@ -190,6 +192,11 @@ class Table extends Component
         // Force re-fetch by clearing the computed memoization.
         unset($this->allItems);
         $this->resetSelection();
+    }
+
+    public function loadQueue(): void
+    {
+        $this->loaded = true;
     }
 
     // ─── Detail ─────────────────────────────────────────

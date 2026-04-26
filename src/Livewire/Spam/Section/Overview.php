@@ -26,6 +26,7 @@ class Overview extends Component
 
     public int $trendDays = 7;
     public int $recentLimit = 50;
+    public bool $loaded = false;
 
     protected WhmClient $whm;
     protected MailSecurityAggregator $sec;
@@ -142,6 +143,11 @@ class Overview extends Component
     public function setTrendDays(int $days): void
     {
         $this->trendDays = in_array($days, [3, 7, 14, 30], true) ? $days : 7;
+    }
+
+    public function loadStats(): void
+    {
+        $this->loaded = true;
     }
 
     public function refresh(): void

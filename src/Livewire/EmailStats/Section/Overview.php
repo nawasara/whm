@@ -26,6 +26,9 @@ class Overview extends Component
 
     public int $trendDays = 7;
 
+    /** Set true after first server-side load so skeletons can flip to real content. */
+    public bool $loaded = false;
+
     protected WhmClient $whm;
     protected EmailStatsAggregator $stats;
 
@@ -168,6 +171,16 @@ class Overview extends Component
     public function setTrendDays(int $days): void
     {
         $this->trendDays = in_array($days, [3, 7, 14, 30], true) ? $days : 7;
+    }
+
+    /**
+     * First render shows skeletons; this is called via wire:init to actually
+     * fetch the SSH data on a follow-up Livewire request. Result: page
+     * appears instantly, skeleton fades to real content within a beat.
+     */
+    public function loadStats(): void
+    {
+        $this->loaded = true;
     }
 
     public function refresh(): void

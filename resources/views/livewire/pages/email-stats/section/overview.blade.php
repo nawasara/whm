@@ -1,4 +1,4 @@
-<div wire:poll.60s>
+<div wire:poll.60s wire:init="loadStats">
     @if (! count($this->servers))
         <div class="text-center py-12 border-2 border-dashed border-gray-200 dark:border-neutral-700 rounded-xl">
             <x-lucide-bar-chart-3 class="size-12 mx-auto text-gray-300 dark:text-neutral-600" />
@@ -27,6 +27,28 @@
             </x-nawasara-ui::button>
         </div>
 
+        @if (! $loaded)
+            {{-- Skeleton: stats cards + trend chart + tiga panel bawah --}}
+            <h2 class="text-base font-semibold text-gray-900 dark:text-white mb-3">Hari Ini ({{ now()->format('d M Y') }})</h2>
+            <x-nawasara-ui::skeleton-stats :cards="6" :cols="6" />
+            <div class="my-6">
+                <div class="p-5 rounded-xl border border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
+                    <x-nawasara-ui::skeleton width="40" height="5" class="mb-4" />
+                    <x-nawasara-ui::skeleton class="w-full" height="40" rounded="md" />
+                </div>
+            </div>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                @for ($i = 0; $i < 3; $i++)
+                    <div class="p-5 rounded-xl border border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 space-y-3">
+                        <x-nawasara-ui::skeleton width="40" height="4" />
+                        <x-nawasara-ui::skeleton class="w-full" height="3" />
+                        <x-nawasara-ui::skeleton class="w-full" height="3" />
+                        <x-nawasara-ui::skeleton class="w-full" height="3" />
+                        <x-nawasara-ui::skeleton width="3/4" height="3" />
+                    </div>
+                @endfor
+            </div>
+        @else
         {{-- Today's stats cards --}}
         <h2 class="text-base font-semibold text-gray-900 dark:text-white mb-3">Hari Ini ({{ now()->format('d M Y') }})</h2>
         <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
@@ -36,7 +58,7 @@
                     ['label' => 'Delivered', 'value' => $this->todayCounts['delivered'], 'color' => 'green', 'icon' => 'lucide-check-circle'],
                     ['label' => 'Bounced', 'value' => $this->todayCounts['bounced'], 'color' => 'red', 'icon' => 'lucide-x-circle'],
                     ['label' => 'Deferred', 'value' => $this->todayCounts['deferred'], 'color' => 'yellow', 'icon' => 'lucide-clock'],
-                    ['label' => 'Spam', 'value' => $this->todayCounts['spam'], 'color' => 'purple', 'icon' => 'lucide-shield-x'],
+                    ['label' => 'Spam', 'value' => $this->todayCounts['spam'], 'color' => 'red', 'icon' => 'lucide-shield-x'],
                     ['label' => 'Queue', 'value' => $this->queueSize, 'color' => 'gray', 'icon' => 'lucide-inbox'],
                 ];
                 $colorMap = [
@@ -44,7 +66,6 @@
                     'green' => 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400 border-green-200 dark:border-green-800',
                     'red' => 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400 border-red-200 dark:border-red-800',
                     'yellow' => 'bg-yellow-50 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800',
-                    'purple' => 'bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400 border-purple-200 dark:border-purple-800',
                     'gray' => 'bg-gray-50 text-gray-700 dark:bg-neutral-800 dark:text-neutral-300 border-gray-200 dark:border-neutral-700',
                 ];
             @endphp
@@ -163,5 +184,6 @@
                 @endif
             </div>
         </div>
+        @endif
     @endif
 </div>

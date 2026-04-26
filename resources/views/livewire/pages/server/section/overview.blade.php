@@ -66,7 +66,7 @@
             </div>
             <div class="bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-xl p-5">
                 <div class="flex items-center gap-3">
-                    <div class="p-2.5 rounded-lg bg-purple-50 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400">
+                    <div class="p-2.5 rounded-lg bg-gray-100 text-gray-600 dark:bg-neutral-700 dark:text-neutral-300">
                         <x-lucide-info class="size-5" />
                     </div>
                     <div>
