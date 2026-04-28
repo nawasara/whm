@@ -1,8 +1,29 @@
 {
     "name": "nawasara/whm",
-    "description": "WHM/cPanel hosting management dashboard for Nawasara",
+    "description": "WHM/cPanel hosting and email operations dashboard for the Nawasara superapp framework — accounts, packages, email accounts, mail queue, mail log search, email statistics, and mail security.",
     "type": "library",
     "license": "MIT",
+    "keywords": [
+        "nawasara",
+        "laravel",
+        "whm",
+        "cpanel",
+        "exim",
+        "hosting",
+        "email-management",
+        "mail-queue"
+    ],
+    "authors": [
+        {
+            "name": "Pringgo J. Saputro",
+            "email": "odyinggo@gmail.com",
+            "role": "Lead Developer"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/nawasara/whm/issues",
+        "source": "https://github.com/nawasara/whm"
+    },
     "autoload": {
         "psr-4": {
             "Nawasara\\Whm\\": "src/"
@@ -13,6 +34,7 @@
         "illuminate/support": "^10.0|^12.0",
         "spatie/laravel-permission": "^6.0",
         "nawasara/ui": "*",
+        "nawasara/sync": "*",
         "nawasara/vault": "*",
         "nawasara/registry": "*",
         "livewire/livewire": "^3.0",
@@ -24,5 +46,7 @@
                 "Nawasara\\Whm\\WhmServiceProvider"
             ]
         }
-    }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
 }
