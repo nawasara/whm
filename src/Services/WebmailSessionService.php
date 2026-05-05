@@ -79,12 +79,52 @@ class WebmailSessionService
             throw new WebmailSessionException('WHM tidak mengembalikan URL session: '.$reason);
         }
 
+        $url = $this->rewritePublicHost($url, $client->instance());
+
         return [
             'url' => $url,
             'expires_in' => $expires,
             'instance' => $client->instance(),
             'service' => $service,
         ];
+    }
+
+    /**
+     * Rewrite host bagian dari session URL ke `webmail_host` Vault kalau
+     * di-set untuk instance ini. Path + query string + cpsess token tetap
+     * intact — cuma scheme + host + port yang ditukar.
+     *
+     * Use case: WHM API balas URL pakai hostname server (ryder.ponorogo.go.id),
+     * tapi user akses lewat hostname public/CNAME (gentapraja.ponorogo.go.id).
+     * Kalau cookie domain WHM scoped ke ryder, login tetap valid karena
+     * Set-Cookie pertama dari ryder ke browser; tapi URL yang user lihat
+     * akhirnya pakai host public.
+     */
+    protected function rewritePublicHost(string $url, ?string $instance): string
+    {
+        $publicHost = (string) \Nawasara\Vault\Facades\Vault::get('whm', 'webmail_host', $instance);
+        if ($publicHost === '') {
+            return $url;
+        }
+
+        $parsed = parse_url($url);
+        $publicParsed = parse_url($publicHost);
+
+        if (! $parsed || ! $publicParsed || empty($publicParsed['host'])) {
+            // Kalau Vault value tidak parseable sebagai URL, jangan rewrite
+            // (defensif — hindari output URL invalid).
+            return $url;
+        }
+
+        $scheme = $publicParsed['scheme'] ?? ($parsed['scheme'] ?? 'https');
+        $host = $publicParsed['host'];
+        $port = $publicParsed['port'] ?? ($parsed['port'] ?? null);
+        $path = $parsed['path'] ?? '';
+        $query = isset($parsed['query']) ? '?'.$parsed['query'] : '';
+        $fragment = isset($parsed['fragment']) ? '#'.$parsed['fragment'] : '';
+
+        $portPart = $port ? ":{$port}" : '';
+        return "{$scheme}://{$host}{$portPart}{$path}{$query}{$fragment}";
     }
 
     /**
