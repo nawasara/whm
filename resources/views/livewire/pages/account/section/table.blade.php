@@ -102,19 +102,15 @@
                                     @endif
                                 </div>
                             @elseif ($asset)
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-50 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
-                                    Belum ditetapkan
-                                </span>
+                                <x-nawasara-ui::badge color="warning">Belum ditetapkan</x-nawasara-ui::badge>
                             @else
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500 dark:bg-neutral-700 dark:text-neutral-400">
-                                    Belum di-link
-                                </span>
+                                <x-nawasara-ui::badge color="neutral">Belum di-link</x-nawasara-ui::badge>
                             @endif
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm">
-                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
+                            <x-nawasara-ui::badge color="info">
                                 {{ $acct->plan ?? '-' }}
-                            </span>
+                            </x-nawasara-ui::badge>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-neutral-400 font-mono">
                             @php
@@ -125,13 +121,9 @@
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm">
                             @if ($acct->suspended)
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400">
-                                    Suspended
-                                </span>
+                                <x-nawasara-ui::badge color="danger" dot>Suspended</x-nawasara-ui::badge>
                             @else
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                                    Active
-                                </span>
+                                <x-nawasara-ui::badge color="success" dot>Active</x-nawasara-ui::badge>
                             @endif
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm">
