@@ -60,14 +60,20 @@ class Dashboard extends Component
     }
 
     /**
-     * Accounts dengan usage info, sorted by max usage descending.
+     * Full unfiltered dataset untuk server aktif. Single source of truth
+     * untuk summary stat-card (yang harus tampil count keseluruhan) maupun
+     * usageList table (yang boleh di-filter).
+     *
+     * Sengaja dipisah dari usageList: kalau summary hitung dari usageList
+     * yang sudah di-filter, klik salah satu stat-card bikin angka di
+     * stat-card lain ikut nol — itu bug yang membingungkan user.
      */
     #[Computed]
-    public function usageList(): array
+    public function allRows(): array
     {
         $accounts = WhmAccount::forInstance($this->server)->get();
 
-        $rows = $accounts->map(function (WhmAccount $acct) {
+        return $accounts->map(function (WhmAccount $acct) {
             $state = $acct->usageState();
             return [
                 'user' => $acct->username,
@@ -83,19 +89,28 @@ class Dashboard extends Component
                 'state' => $state,
                 'suspended' => $acct->suspended,
             ];
-        });
+        })->sortByDesc('max_pct')->values()->all();
+    }
+
+    /**
+     * Filtered + sorted rows untuk table.
+     */
+    #[Computed]
+    public function usageList(): array
+    {
+        $rows = collect($this->allRows);
 
         if ($this->stateFilter) {
             $rows = $rows->where('state', $this->stateFilter);
         }
 
-        return $rows->sortByDesc('max_pct')->values()->all();
+        return $rows->values()->all();
     }
 
     #[Computed]
     public function summary(): array
     {
-        $all = collect($this->usageList);
+        $all = collect($this->allRows);
 
         return [
             'total' => $all->count(),
@@ -112,7 +127,7 @@ class Dashboard extends Component
 
     public function updatedServer(): void
     {
-        unset($this->usageList, $this->summary, $this->lastSyncedAt);
+        unset($this->allRows, $this->usageList, $this->summary, $this->lastSyncedAt);
     }
 
     public function render()
