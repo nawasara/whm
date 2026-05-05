@@ -36,14 +36,14 @@
                 </div>
                 <div class="md:col-span-2">
                     <x-nawasara-ui::form.label value="Quick Range" />
-                    <div class="flex flex-wrap gap-1">
-                        @foreach (['today' => 'Hari ini', '24h' => '24 jam', '7d' => '7 hari', '30d' => '30 hari'] as $val => $label)
-                            <button type="button" wire:click="setQuickRange('{{ $val }}')"
-                                class="px-3 py-1.5 text-xs rounded-lg border border-gray-200 dark:border-neutral-700 text-gray-700 dark:text-neutral-300 hover:bg-gray-50 dark:hover:bg-neutral-700">
-                                {{ $label }}
-                            </button>
-                        @endforeach
-                    </div>
+                    {{-- setQuickRange() tidak menyimpan key sebagai state — dia
+                         translate ke dateFrom langsung. Jadi segmented-control
+                         tidak punya "active" feedback (intentional: quick-shortcut
+                         behavior, bukan persistent filter). --}}
+                    <x-nawasara-ui::segmented-control
+                        :options="['today' => 'Hari ini', '24h' => '24 jam', '7d' => '7 hari', '30d' => '30 hari']"
+                        wire-method="setQuickRange"
+                        size="sm" />
                 </div>
             </div>
 
@@ -127,24 +127,25 @@
                             </td>
                             <td class="px-6 py-2 whitespace-nowrap text-sm">
                                 @php
-                                    $color = match ($entry['status']) {
-                                        'received' => 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-                                        'delivered', 'completed' => 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-                                        'bounced' => 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-                                        'deferred' => 'bg-yellow-50 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
-                                        default => 'bg-gray-50 text-gray-700 dark:bg-neutral-700 dark:text-neutral-300',
+                                    $statusColor = match ($entry['status']) {
+                                        'received' => 'primary',
+                                        'delivered', 'completed' => 'success',
+                                        'bounced' => 'danger',
+                                        'deferred' => 'warning',
+                                        default => 'neutral',
                                     };
                                 @endphp
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {{ $color }}">
+                                <x-nawasara-ui::badge :color="$statusColor">
                                     {{ ucfirst($entry['status']) }}
-                                </span>
+                                </x-nawasara-ui::badge>
                             </td>
                             <td class="px-6 py-2 whitespace-nowrap text-xs font-mono">
                                 @if ($entry['message_id'])
-                                    <button type="button" wire:click="openTrace('{{ $entry['message_id'] }}')"
-                                        class="text-blue-600 dark:text-blue-400 hover:underline">
+                                    <x-nawasara-ui::button variant="link" color="primary" size="sm"
+                                        wire:click="openTrace('{{ $entry['message_id'] }}')"
+                                        class="text-xs font-mono">
                                         {{ $entry['message_id'] }}
-                                    </button>
+                                    </x-nawasara-ui::button>
                                 @else
                                     <span class="text-gray-400">-</span>
                                 @endif
