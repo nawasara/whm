@@ -9,54 +9,37 @@
 
         {{-- Summary cards (clickable for filter) --}}
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <button type="button" wire:click="setStateFilter('')"
-                class="text-left bg-white dark:bg-neutral-800 border {{ $stateFilter === '' ? 'border-blue-500 ring-2 ring-blue-100 dark:ring-blue-900/30' : 'border-gray-200 dark:border-neutral-700' }} rounded-xl p-5 hover:shadow-md transition-all">
-                <div class="flex items-center gap-3">
-                    <div class="p-2.5 rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
-                        <x-lucide-users class="size-5" />
-                    </div>
-                    <div>
-                        <p class="text-xs text-gray-500 dark:text-neutral-400">Total Accounts</p>
-                        <p class="text-2xl font-bold text-gray-800 dark:text-neutral-200">{{ $this->summary['total'] }}</p>
-                    </div>
-                </div>
-            </button>
-            <button type="button" wire:click="setStateFilter('ok')"
-                class="text-left bg-white dark:bg-neutral-800 border {{ $stateFilter === 'ok' ? 'border-green-500 ring-2 ring-green-100 dark:ring-green-900/30' : 'border-gray-200 dark:border-neutral-700' }} rounded-xl p-5 hover:shadow-md transition-all">
-                <div class="flex items-center gap-3">
-                    <div class="p-2.5 rounded-lg bg-green-50 text-green-600 dark:bg-green-900/30 dark:text-green-400">
-                        <x-lucide-check-circle class="size-5" />
-                    </div>
-                    <div>
-                        <p class="text-xs text-gray-500 dark:text-neutral-400">Healthy (&lt; 80%)</p>
-                        <p class="text-2xl font-bold text-gray-800 dark:text-neutral-200">{{ $this->summary['ok'] }}</p>
-                    </div>
-                </div>
-            </button>
-            <button type="button" wire:click="setStateFilter('warning')"
-                class="text-left bg-white dark:bg-neutral-800 border {{ $stateFilter === 'warning' ? 'border-yellow-500 ring-2 ring-yellow-100 dark:ring-yellow-900/30' : 'border-gray-200 dark:border-neutral-700' }} rounded-xl p-5 hover:shadow-md transition-all">
-                <div class="flex items-center gap-3">
-                    <div class="p-2.5 rounded-lg bg-yellow-50 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400">
-                        <x-lucide-alert-triangle class="size-5" />
-                    </div>
-                    <div>
-                        <p class="text-xs text-gray-500 dark:text-neutral-400">Warning (&gt;= 80%)</p>
-                        <p class="text-2xl font-bold text-gray-800 dark:text-neutral-200">{{ $this->summary['warning'] }}</p>
-                    </div>
-                </div>
-            </button>
-            <button type="button" wire:click="setStateFilter('critical')"
-                class="text-left bg-white dark:bg-neutral-800 border {{ $stateFilter === 'critical' ? 'border-red-500 ring-2 ring-red-100 dark:ring-red-900/30' : 'border-gray-200 dark:border-neutral-700' }} rounded-xl p-5 hover:shadow-md transition-all">
-                <div class="flex items-center gap-3">
-                    <div class="p-2.5 rounded-lg bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400">
-                        <x-lucide-alert-circle class="size-5" />
-                    </div>
-                    <div>
-                        <p class="text-xs text-gray-500 dark:text-neutral-400">Critical (&gt;= 95%)</p>
-                        <p class="text-2xl font-bold text-gray-800 dark:text-neutral-200">{{ $this->summary['critical'] }}</p>
-                    </div>
-                </div>
-            </button>
+            <x-nawasara-ui::stat-card
+                label="Total Accounts"
+                :value="$this->summary['total']"
+                icon="lucide-users"
+                color="primary"
+                :active="$stateFilter === ''"
+                wire:click="setStateFilter('')" />
+
+            <x-nawasara-ui::stat-card
+                label="Healthy (< 80%)"
+                :value="$this->summary['ok']"
+                icon="lucide-check-circle"
+                color="success"
+                :active="$stateFilter === 'ok'"
+                wire:click="setStateFilter('ok')" />
+
+            <x-nawasara-ui::stat-card
+                label="Warning (>= 80%)"
+                :value="$this->summary['warning']"
+                icon="lucide-alert-triangle"
+                color="warning"
+                :active="$stateFilter === 'warning'"
+                wire:click="setStateFilter('warning')" />
+
+            <x-nawasara-ui::stat-card
+                label="Critical (>= 95%)"
+                :value="$this->summary['critical']"
+                icon="lucide-alert-circle"
+                color="danger"
+                :active="$stateFilter === 'critical'"
+                wire:click="setStateFilter('critical')" />
         </div>
 
         {{-- Usage Table --}}
@@ -66,14 +49,16 @@
             <x-slot:table>
                 @forelse ($this->usageList as $row)
                     @php
-                        $stateBadge = match($row['state']) {
-                            'ok' => 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-                            'warning' => 'bg-yellow-50 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
-                            'critical' => 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-                            default => 'bg-gray-100 text-gray-700 dark:bg-neutral-700 dark:text-neutral-400',
+                        $stateColor = match ($row['state']) {
+                            'ok' => 'success',
+                            'warning' => 'warning',
+                            'critical' => 'danger',
+                            default => 'neutral',
                         };
-                        $diskBarColor = $row['disk_pct'] >= 95 ? 'bg-red-500' : ($row['disk_pct'] >= 80 ? 'bg-yellow-500' : 'bg-green-500');
-                        $bwBarColor = $row['bw_pct'] >= 95 ? 'bg-red-500' : ($row['bw_pct'] >= 80 ? 'bg-yellow-500' : 'bg-green-500');
+                        // Bar color tetap inline literal — itu visualisasi data, bukan
+                        // status indicator, jadi tidak masuk akal di-componentize.
+                        $diskBarColor = $row['disk_pct'] >= 95 ? 'bg-rose-500' : ($row['disk_pct'] >= 80 ? 'bg-amber-500' : 'bg-green-500');
+                        $bwBarColor = $row['bw_pct'] >= 95 ? 'bg-rose-500' : ($row['bw_pct'] >= 80 ? 'bg-amber-500' : 'bg-green-500');
                     @endphp
                     <tr>
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-800 dark:text-neutral-200 font-mono">
@@ -83,9 +68,9 @@
                             {{ $row['domain'] }}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm">
-                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
+                            <x-nawasara-ui::badge color="info" variant="soft">
                                 {{ $row['plan'] }}
-                            </span>
+                            </x-nawasara-ui::badge>
                         </td>
                         <td class="px-6 py-4 min-w-[180px]">
                             <div class="flex items-center justify-between text-xs mb-1">
@@ -106,13 +91,13 @@
                             </div>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm">
-                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {{ $stateBadge }}">
+                            <x-nawasara-ui::badge :color="$stateColor" dot>
                                 {{ ucfirst($row['state']) }}
-                            </span>
+                            </x-nawasara-ui::badge>
                             @if ($row['suspended'])
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 dark:bg-neutral-700 dark:text-neutral-400 ml-1">
+                                <x-nawasara-ui::badge color="neutral" class="ml-1">
                                     Suspended
-                                </span>
+                                </x-nawasara-ui::badge>
                             @endif
                         </td>
                     </tr>
