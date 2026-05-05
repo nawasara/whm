@@ -163,6 +163,25 @@ class WhmClient
         }
     }
 
+    /**
+     * Low-level WHM JSON API caller untuk endpoint yang belum punya method
+     * dedicated. Throw exception kalau HTTP gagal — caller bertanggungjawab
+     * baca shape response.
+     *
+     * Dipakai oleh WebmailSessionService dan helper lain yang butuh
+     * endpoint generic (mis. create_user_session, version, dst).
+     *
+     * @return array  full decoded response (data + metadata)
+     */
+    public function rawJsonApi(string $endpoint, array $params = []): array
+    {
+        $params = array_merge(['api.version' => 1], $params);
+
+        $response = $this->api()->get($endpoint, $params)->throw();
+
+        return $response->json() ?? [];
+    }
+
     // ─── Accounts ───────────────────────────────────────
 
     /**

@@ -43,6 +43,9 @@ class PermissionSeeder extends Seeder
 
             // SSH gating
             'whm.ssh.execute',
+
+            // Webmail session (create_user_session API)
+            'whm.session.create',
         ];
 
         foreach ($permissions as $permission) {
