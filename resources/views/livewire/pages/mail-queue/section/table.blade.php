@@ -119,17 +119,11 @@
                         </td>
                         <td class="px-6 py-3 whitespace-nowrap text-sm">
                             @if ($item['status'] === 'frozen')
-                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400">
-                                    <x-lucide-snowflake class="size-3" /> Frozen
-                                </span>
+                                <x-nawasara-ui::badge color="danger" icon="lucide-snowflake">Frozen</x-nawasara-ui::badge>
                             @elseif ($item['status'] === 'deferred')
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-50 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
-                                    Deferred
-                                </span>
+                                <x-nawasara-ui::badge color="warning">Deferred</x-nawasara-ui::badge>
                             @else
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
-                                    Queued
-                                </span>
+                                <x-nawasara-ui::badge color="primary">Queued</x-nawasara-ui::badge>
                             @endif
                         </td>
                         <td class="px-6 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-neutral-400 font-mono">
@@ -154,11 +148,12 @@
                                     {{ \Illuminate\Support\Str::limit($item['last_error'], 80) }}
                                 </div>
                             @elseif ($item['age_seconds'] > 86400 && $item['status'] !== 'frozen')
-                                <button type="button" wire:click="openDetail('{{ $item['id'] }}')"
-                                    class="text-xs text-yellow-600 dark:text-yellow-400 mt-0.5 hover:underline inline-flex items-center gap-1">
-                                    <x-lucide-alert-circle class="size-3" />
+                                <x-nawasara-ui::button variant="link" color="warning" size="sm"
+                                    wire:click="openDetail('{{ $item['id'] }}')"
+                                    class="text-xs mt-0.5">
+                                    <x-slot:icon><x-lucide-alert-circle /></x-slot:icon>
                                     Stuck >24h — lihat delivery log
-                                </button>
+                                </x-nawasara-ui::button>
                             @endif
                         </td>
                         <td class="px-6 py-3 whitespace-nowrap text-sm text-right">
@@ -208,22 +203,15 @@
     {{-- Detail Modal --}}
     <x-nawasara-ui::modal id="whm-mailqueue-detail" maxWidth="3xl" :title="'Message: '.($detailId ?? '')">
         @if ($detailId)
-            {{-- Tab nav --}}
-            <div class="border-b border-gray-200 dark:border-neutral-700 mb-3">
-                <nav class="flex -mb-px gap-4 text-sm" aria-label="Tabs">
-                    <button type="button" wire:click="setDetailTab('log')"
-                        class="py-2 px-1 border-b-2 font-medium {{ $detailTab === 'log' ? 'border-blue-600 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-neutral-400 dark:hover:text-neutral-300' }}">
-                        <x-lucide-activity class="size-4 inline -mt-0.5" /> Delivery Log
-                    </button>
-                    <button type="button" wire:click="setDetailTab('headers')"
-                        class="py-2 px-1 border-b-2 font-medium {{ $detailTab === 'headers' ? 'border-blue-600 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-neutral-400 dark:hover:text-neutral-300' }}">
-                        <x-lucide-mail class="size-4 inline -mt-0.5" /> Headers
-                    </button>
-                    <button type="button" wire:click="setDetailTab('body')"
-                        class="py-2 px-1 border-b-2 font-medium {{ $detailTab === 'body' ? 'border-blue-600 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-neutral-400 dark:hover:text-neutral-300' }}">
-                        <x-lucide-file-text class="size-4 inline -mt-0.5" /> Body Preview
-                    </button>
-                </nav>
+            <div class="mb-3">
+                <x-nawasara-ui::tab-switcher
+                    :items="[
+                        ['key' => 'log', 'label' => 'Delivery Log', 'icon' => 'lucide-activity'],
+                        ['key' => 'headers', 'label' => 'Headers', 'icon' => 'lucide-mail'],
+                        ['key' => 'body', 'label' => 'Body Preview', 'icon' => 'lucide-file-text'],
+                    ]"
+                    :active="$detailTab"
+                    wire-method="setDetailTab" />
             </div>
 
             <div class="text-sm">
