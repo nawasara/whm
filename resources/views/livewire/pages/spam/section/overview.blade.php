@@ -80,16 +80,11 @@
         <div class="mb-6 p-5 rounded-xl border border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
             <div class="flex items-center justify-between mb-4">
                 <h3 class="text-base font-semibold text-gray-900 dark:text-white">Trend Reject ({{ $trendDays }} hari)</h3>
-                <div class="flex items-center gap-1 text-xs">
-                    @foreach ([3, 7, 14, 30] as $d)
-                        <button wire:click="setTrendDays({{ $d }})"
-                            class="px-3 py-1 rounded {{ $trendDays === $d
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-600' }}">
-                            {{ $d }}d
-                        </button>
-                    @endforeach
-                </div>
+                <x-nawasara-ui::segmented-control
+                    :options="['3' => '3d', '7' => '7d', '14' => '14d', '30' => '30d']"
+                    :active="(string) $trendDays"
+                    wire-method="setTrendDays"
+                    size="sm" />
             </div>
 
             @if (empty($this->trend))
