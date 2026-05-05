@@ -91,13 +91,9 @@
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm">
                             @if ($acct->isSuspended())
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400">
-                                    Suspended
-                                </span>
+                                <x-nawasara-ui::badge color="danger" dot>Suspended</x-nawasara-ui::badge>
                             @else
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                                    Active
-                                </span>
+                                <x-nawasara-ui::badge color="success" dot>Active</x-nawasara-ui::badge>
                             @endif
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm">
@@ -160,10 +156,11 @@
             <div>
                 <div class="flex items-center justify-between mb-1">
                     <x-nawasara-ui::form.label value="Password" />
-                    <button type="button" wire:click="generatePassword"
-                        class="text-xs text-blue-600 hover:underline dark:text-blue-400">
+                    <x-nawasara-ui::button variant="link" color="primary" size="sm"
+                        wire:click="generatePassword"
+                        class="text-xs">
                         Generate
-                    </button>
+                    </x-nawasara-ui::button>
                 </div>
                 <x-nawasara-ui::form.input type="password" wire:model="formPassword"
                     usePasswordField useError errorVariable="formPassword" />
@@ -187,10 +184,11 @@
             <div>
                 <div class="flex items-center justify-between mb-1">
                     <x-nawasara-ui::form.label value="Password Baru" />
-                    <button type="button" wire:click="generatePasswordReset"
-                        class="text-xs text-blue-600 hover:underline dark:text-blue-400">
+                    <x-nawasara-ui::button variant="link" color="primary" size="sm"
+                        wire:click="generatePasswordReset"
+                        class="text-xs">
                         Generate
-                    </button>
+                    </x-nawasara-ui::button>
                 </div>
                 <x-nawasara-ui::form.input type="password" wire:model="pwNewPassword"
                     usePasswordField useError errorVariable="pwNewPassword" />
