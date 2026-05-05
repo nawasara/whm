@@ -135,11 +135,18 @@ class WebmailSessionService
         // Parent cPanel account suspension — cek listAccounts cache. Kalau
         // parent suspended, semua mailbox di bawahnya tidak bisa dipakai
         // walau flag mailbox-nya bersih.
+        //
+        // WHM listaccts response convention:
+        //   - `suspended`: 0|1 (atau "0"/"1" string)
+        //   - `suspendreason`: literal "not suspended" saat aktif, alasan
+        //     spesifik saat suspended. Field ini SELALU ada isinya, jadi
+        //     jangan trust empty-string check — andalkan flag `suspended`.
         $accs = $client->getCachedAccounts();
         $parent = collect($accs)->first(fn ($a) => strcasecmp($a['domain'] ?? '', $domain) === 0);
 
-        if ($parent && (($parent['suspended'] ?? 0) || ($parent['suspendreason'] ?? '') !== '')) {
-            throw new MailboxSuspendedException("Parent cPanel account untuk domain `{$domain}` sedang suspended.");
+        if ($parent && (int) ($parent['suspended'] ?? 0) === 1) {
+            $reason = (string) ($parent['suspendreason'] ?? 'unknown');
+            throw new MailboxSuspendedException("Parent cPanel account untuk domain `{$domain}` sedang suspended ({$reason}).");
         }
     }
 
