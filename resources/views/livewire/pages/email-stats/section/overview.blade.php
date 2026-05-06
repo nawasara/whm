@@ -4,7 +4,7 @@
             <x-lucide-bar-chart-3 class="size-12 mx-auto text-gray-300 dark:text-neutral-600" />
             <p class="mt-3 text-sm text-gray-700 dark:text-neutral-300 font-medium">Belum ada server WHM dengan role mail</p>
             <p class="mt-1 text-xs text-gray-500 dark:text-neutral-400">
-                Tambahkan credential WHM di <a href="{{ url('nawasara-vault/credentials') }}" wire:navigate class="text-blue-600 hover:underline">Vault</a> dan set role = mail.
+                Tambahkan credential WHM di <a href="{{ url('nawasara-vault/credentials') }}" wire:navigate class="text-emerald-700 dark:text-emerald-400 hover:underline font-medium">Vault</a> dan set role = mail.
             </p>
         </div>
     @elseif (! $this->isConfigured)

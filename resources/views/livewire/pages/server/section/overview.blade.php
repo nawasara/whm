@@ -4,7 +4,7 @@
             <x-lucide-server class="size-12 mx-auto text-gray-300 dark:text-neutral-600" />
             <p class="mt-3 text-sm text-gray-700 dark:text-neutral-300 font-medium">Belum ada server WHM dikonfigurasi</p>
             <p class="mt-1 text-xs text-gray-500 dark:text-neutral-400">
-                Tambahkan credential WHM di <a href="{{ url('nawasara-vault/credentials') }}" wire:navigate class="text-blue-600 hover:underline">Vault</a>.
+                Tambahkan credential WHM di <a href="{{ url('nawasara-vault/credentials') }}" wire:navigate class="text-emerald-700 dark:text-emerald-400 hover:underline font-medium">Vault</a>.
             </p>
         </div>
     @else
@@ -29,52 +29,41 @@
             </div>
         @endif
 
-        {{-- Stats Cards --}}
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div class="bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-xl p-5">
-                <div class="flex items-center gap-3">
-                    <div class="p-2.5 rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
-                        <x-lucide-users class="size-5" />
-                    </div>
-                    <div>
-                        <p class="text-xs text-gray-500 dark:text-neutral-400">Total Accounts</p>
-                        <p class="text-2xl font-bold text-gray-800 dark:text-neutral-200">{{ $this->accountsCount['total'] ?? 0 }}</p>
-                    </div>
-                </div>
-            </div>
-            <div class="bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-xl p-5">
-                <div class="flex items-center gap-3">
-                    <div class="p-2.5 rounded-lg bg-green-50 text-green-600 dark:bg-green-900/30 dark:text-green-400">
-                        <x-lucide-check-circle class="size-5" />
-                    </div>
-                    <div>
-                        <p class="text-xs text-gray-500 dark:text-neutral-400">Active</p>
-                        <p class="text-2xl font-bold text-gray-800 dark:text-neutral-200">{{ $this->accountsCount['active'] ?? 0 }}</p>
-                    </div>
-                </div>
-            </div>
-            <div class="bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-xl p-5">
-                <div class="flex items-center gap-3">
-                    <div class="p-2.5 rounded-lg bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400">
-                        <x-lucide-pause class="size-5" />
-                    </div>
-                    <div>
-                        <p class="text-xs text-gray-500 dark:text-neutral-400">Suspended</p>
-                        <p class="text-2xl font-bold text-gray-800 dark:text-neutral-200">{{ $this->accountsCount['suspended'] ?? 0 }}</p>
-                    </div>
-                </div>
-            </div>
-            <div class="bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-xl p-5">
-                <div class="flex items-center gap-3">
-                    <div class="p-2.5 rounded-lg bg-gray-100 text-gray-600 dark:bg-neutral-700 dark:text-neutral-300">
-                        <x-lucide-info class="size-5" />
-                    </div>
-                    <div>
-                        <p class="text-xs text-gray-500 dark:text-neutral-400">WHM Version</p>
-                        <p class="text-sm font-mono font-bold text-gray-800 dark:text-neutral-200 mt-1">{{ $this->status['version'] ?? '-' }}</p>
-                    </div>
-                </div>
-            </div>
+        {{-- Stats Cards — pakai design-system stat-card untuk konsistensi
+             dengan dashboard /home dan WHM Usage. Suspended pakai warning
+             karena bukan critical, tapi perlu attention. --}}
+        @php
+            $suspended = $this->accountsCount['suspended'] ?? 0;
+        @endphp
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <x-nawasara-ui::stat-card
+                label="Total Accounts"
+                :value="number_format($this->accountsCount['total'] ?? 0)"
+                icon="lucide-users"
+                color="primary"
+                accent />
+
+            <x-nawasara-ui::stat-card
+                label="Active"
+                :value="number_format($this->accountsCount['active'] ?? 0)"
+                icon="lucide-circle-check"
+                color="success"
+                accent />
+
+            <x-nawasara-ui::stat-card
+                label="Suspended"
+                :value="number_format($suspended)"
+                icon="lucide-pause"
+                :color="$suspended > 0 ? 'warning' : 'neutral'"
+                accent />
+
+            <x-nawasara-ui::stat-card
+                label="WHM Version"
+                :value="$this->status['version'] ?? '-'"
+                icon="lucide-info"
+                color="neutral"
+                description="control panel"
+                accent />
         </div>
 
         {{-- Load Average --}}

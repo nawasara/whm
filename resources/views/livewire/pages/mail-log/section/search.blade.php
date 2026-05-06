@@ -4,7 +4,7 @@
             <x-lucide-scroll-text class="size-12 mx-auto text-gray-300 dark:text-neutral-600" />
             <p class="mt-3 text-sm text-gray-700 dark:text-neutral-300 font-medium">Belum ada server WHM dengan role mail</p>
             <p class="mt-1 text-xs text-gray-500 dark:text-neutral-400">
-                Tambahkan credential WHM di <a href="{{ url('nawasara-vault/credentials') }}" wire:navigate class="text-blue-600 hover:underline">Vault</a> dan set role = mail.
+                Tambahkan credential WHM di <a href="{{ url('nawasara-vault/credentials') }}" wire:navigate class="text-emerald-700 dark:text-emerald-400 hover:underline font-medium">Vault</a> dan set role = mail.
             </p>
         </div>
     @elseif (! $this->isConfigured)
@@ -13,7 +13,7 @@
             <p class="mt-3 text-sm text-gray-700 dark:text-neutral-300 font-medium">SSH belum dikonfigurasi untuk server ini</p>
             <p class="mt-1 text-xs text-gray-500 dark:text-neutral-400">
                 Mail Log search butuh akses SSH. Edit credential di
-                <a href="{{ url('nawasara-vault/credentials') }}" wire:navigate class="text-blue-600 hover:underline">Vault</a>
+                <a href="{{ url('nawasara-vault/credentials') }}" wire:navigate class="text-emerald-700 dark:text-emerald-400 hover:underline font-medium">Vault</a>
                 dan isi field SSH.
             </p>
         </div>
@@ -77,7 +77,7 @@
                     <x-nawasara-ui::form.label value="Limit Hasil (max 5000)" />
                     <x-nawasara-ui::form.input type="number" wire:model="limit" min="10" max="5000" />
                     <label class="flex items-center gap-2 mt-2 text-xs text-gray-600 dark:text-neutral-400 cursor-pointer">
-                        <input type="checkbox" wire:model="hideNoise" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:bg-neutral-800 dark:border-neutral-600">
+                        <input type="checkbox" wire:model="hideNoise" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 dark:bg-neutral-800 dark:border-neutral-600">
                         Sembunyikan noise (event tanpa msg id: connection log, auth fail)
                     </label>
                 </div>

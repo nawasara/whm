@@ -4,7 +4,7 @@
             <x-lucide-inbox class="size-12 mx-auto text-gray-300 dark:text-neutral-600" />
             <p class="mt-3 text-sm text-gray-700 dark:text-neutral-300 font-medium">Belum ada server WHM dengan role mail</p>
             <p class="mt-1 text-xs text-gray-500 dark:text-neutral-400">
-                Tambahkan credential WHM di <a href="{{ url('nawasara-vault/credentials') }}" wire:navigate class="text-blue-600 hover:underline">Vault</a> dan set role = mail.
+                Tambahkan credential WHM di <a href="{{ url('nawasara-vault/credentials') }}" wire:navigate class="text-emerald-700 dark:text-emerald-400 hover:underline font-medium">Vault</a> dan set role = mail.
             </p>
         </div>
     @elseif (! $this->isConfigured)
@@ -13,7 +13,7 @@
             <p class="mt-3 text-sm text-gray-700 dark:text-neutral-300 font-medium">SSH belum dikonfigurasi untuk server ini</p>
             <p class="mt-1 text-xs text-gray-500 dark:text-neutral-400">
                 Mail Queue butuh akses SSH ke server. Edit credential di
-                <a href="{{ url('nawasara-vault/credentials') }}" wire:navigate class="text-blue-600 hover:underline">Vault</a>
+                <a href="{{ url('nawasara-vault/credentials') }}" wire:navigate class="text-emerald-700 dark:text-emerald-400 hover:underline font-medium">Vault</a>
                 dan isi field SSH (user, port, private key).
             </p>
         </div>
@@ -35,13 +35,13 @@
             <div class="flex items-center gap-3">
                 <span><strong class="text-gray-700 dark:text-neutral-300">{{ count($this->allItems) }}</strong> total dalam queue</span>
                 @if ($this->statusCounts['queued'] > 0)
-                    <span class="text-blue-600">{{ $this->statusCounts['queued'] }} queued</span>
+                    <span class="text-cyan-700 dark:text-cyan-400">{{ $this->statusCounts['queued'] }} queued</span>
                 @endif
                 @if ($this->statusCounts['deferred'] > 0)
-                    <span class="text-yellow-600">{{ $this->statusCounts['deferred'] }} deferred</span>
+                    <span class="text-amber-700 dark:text-amber-400">{{ $this->statusCounts['deferred'] }} deferred</span>
                 @endif
                 @if ($this->statusCounts['frozen'] > 0)
-                    <span class="text-red-600">{{ $this->statusCounts['frozen'] }} frozen</span>
+                    <span class="text-rose-700 dark:text-rose-400">{{ $this->statusCounts['frozen'] }} frozen</span>
                 @endif
             </div>
         </div>
@@ -102,7 +102,7 @@
         @endcan
 
         @php
-            $selectAllHeader = '<input type="checkbox" wire:model.live="selectAll" class="size-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:bg-neutral-800 dark:border-neutral-600">';
+            $selectAllHeader = '<input type="checkbox" wire:model.live="selectAll" class="size-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 dark:bg-neutral-800 dark:border-neutral-600">';
         @endphp
         <x-nawasara-ui::table
             :headers="[$selectAllHeader, 'ID', 'Status', 'Age', 'Size', 'Sender', 'Recipients', '']"
@@ -112,7 +112,7 @@
                     <tr wire:key="qi-{{ $item['id'] }}" class="{{ in_array($item['id'], $selected) ? 'bg-blue-50/50 dark:bg-blue-900/10' : '' }}">
                         <td class="px-6 py-3 whitespace-nowrap">
                             <input type="checkbox" wire:model.live="selected" value="{{ $item['id'] }}"
-                                class="size-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:bg-neutral-800 dark:border-neutral-600">
+                                class="size-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 dark:bg-neutral-800 dark:border-neutral-600">
                         </td>
                         <td class="px-6 py-3 whitespace-nowrap text-xs font-mono text-gray-700 dark:text-neutral-300">
                             {{ $item['id'] }}

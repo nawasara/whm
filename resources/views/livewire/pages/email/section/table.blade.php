@@ -4,7 +4,7 @@
             <x-lucide-mail class="size-12 mx-auto text-gray-300 dark:text-neutral-600" />
             <p class="mt-3 text-sm text-gray-700 dark:text-neutral-300 font-medium">Belum ada server WHM dengan role mail</p>
             <p class="mt-1 text-xs text-gray-500 dark:text-neutral-400">
-                Tambahkan credential WHM di <a href="{{ url('nawasara-vault/credentials') }}" wire:navigate class="text-blue-600 hover:underline">Vault</a> dan set role = mail.
+                Tambahkan credential WHM di <a href="{{ url('nawasara-vault/credentials') }}" wire:navigate class="text-emerald-700 dark:text-emerald-400 hover:underline font-medium">Vault</a> dan set role = mail.
             </p>
         </div>
     @else
@@ -14,15 +14,15 @@
                 @if ($this->lastSyncedAt)
                     <span><x-lucide-clock class="size-3 inline" /> Last sync: {{ $this->lastSyncedAt }}</span>
                 @else
-                    <span class="text-yellow-600">Belum pernah di-sync. Klik "Sync Sekarang" untuk fetch data dari WHM.</span>
+                    <span class="text-amber-700 dark:text-amber-400">Belum pernah di-sync. Klik "Sync Sekarang" untuk fetch data dari WHM.</span>
                 @endif
                 @if ($this->pendingCount > 0)
-                    <span class="text-blue-600 dark:text-blue-400 animate-pulse">
+                    <span class="text-cyan-700 dark:text-cyan-400 animate-pulse">
                         <x-lucide-clock class="size-3 inline" /> {{ $this->pendingCount }} pending sync
                     </span>
                 @endif
             </div>
-            <a href="{{ url('admin/sync/jobs') }}" wire:navigate class="text-blue-600 hover:underline">
+            <a href="{{ url('admin/sync/jobs') }}" wire:navigate class="text-emerald-700 dark:text-emerald-400 hover:underline font-medium">
                 Lihat Sync Jobs →
             </a>
         </div>
@@ -74,7 +74,7 @@
         @endcan
 
         @php
-            $selectAllHeader = '<input type="checkbox" wire:model.live="selectAll" class="size-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:bg-neutral-800 dark:border-neutral-600">';
+            $selectAllHeader = '<input type="checkbox" wire:model.live="selectAll" class="size-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 dark:bg-neutral-800 dark:border-neutral-600">';
         @endphp
         <x-nawasara-ui::table
             :headers="[$selectAllHeader, 'Email', 'Status', 'Sync', '']"
@@ -84,7 +84,7 @@
                     <tr wire:key="email-{{ $acct->id }}" class="{{ in_array((string) $acct->id, $selected) ? 'bg-blue-50/50 dark:bg-blue-900/10' : '' }}">
                         <td class="px-6 py-4 whitespace-nowrap">
                             <input type="checkbox" wire:model.live="selected" value="{{ $acct->id }}"
-                                class="size-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:bg-neutral-800 dark:border-neutral-600">
+                                class="size-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 dark:bg-neutral-800 dark:border-neutral-600">
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-800 dark:text-neutral-200 font-mono">
                             {{ $acct->email }}
