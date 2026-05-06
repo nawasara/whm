@@ -108,7 +108,7 @@
                             $running = ($service['running'] ?? 0) == 1;
                         @endphp
                         <div class="flex items-center gap-2 p-3 rounded-lg bg-gray-50 dark:bg-neutral-700/50">
-                            <div class="size-2 rounded-full {{ $running ? 'bg-green-500' : 'bg-red-500' }}"></div>
+                            <div class="size-2 rounded-full {{ $running ? 'bg-green-500 text-green-500/40 animate-pulse-dot' : 'bg-red-500' }}"></div>
                             <div class="flex-1 min-w-0">
                                 <p class="text-sm font-medium text-gray-800 dark:text-neutral-200 truncate">{{ $service['display_name'] ?? $service['name'] ?? '-' }}</p>
                                 <p class="text-xs {{ $running ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400' }}">
