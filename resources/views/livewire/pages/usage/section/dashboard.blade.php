@@ -1,44 +1,61 @@
 <div class="space-y-6">
     @if (! count($this->servers))
-        <div class="text-center py-12 border-2 border-dashed border-gray-200 dark:border-neutral-700 rounded-xl">
-            <x-lucide-server class="size-12 mx-auto text-gray-300 dark:text-neutral-600" />
-            <p class="mt-3 text-sm text-gray-700 dark:text-neutral-300 font-medium">Belum ada server WHM dikonfigurasi</p>
+        {{-- Empty state — premium look mirip dashboard /home --}}
+        <div class="text-center py-16 px-6 border-2 border-dashed border-gray-200 dark:border-neutral-700 rounded-xl bg-gray-50/50 dark:bg-neutral-900/40">
+            <div class="inline-flex items-center justify-center size-14 rounded-2xl bg-gray-100 dark:bg-neutral-800 mb-4">
+                <x-lucide-server class="size-7 text-gray-400 dark:text-neutral-500" />
+            </div>
+            <p class="text-base font-semibold text-gray-800 dark:text-neutral-200">
+                Belum ada server WHM dikonfigurasi
+            </p>
+            <p class="mt-2 text-sm text-gray-500 dark:text-neutral-400 max-w-sm mx-auto">
+                Tambahkan WHM server di Settings untuk mulai monitoring resource usage akun hosting.
+            </p>
         </div>
     @else
         <x-nawasara-whm::server-switcher :servers="$this->servers" role="hosting" />
 
-        {{-- Summary cards (clickable for filter) --}}
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {{-- Summary cards (clickable for filter).
+             Accent border-left + active ring kasih dual visual feedback:
+             accent = brand consistency, active = mana yang sedang dipilih. --}}
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <x-nawasara-ui::stat-card
                 label="Total Accounts"
                 :value="$this->summary['total']"
                 icon="lucide-users"
                 color="primary"
                 :active="$stateFilter === ''"
+                accent
                 wire:click="setStateFilter('')" />
 
             <x-nawasara-ui::stat-card
-                label="Healthy (< 80%)"
+                label="Healthy"
                 :value="$this->summary['ok']"
-                icon="lucide-check-circle"
+                icon="lucide-circle-check"
                 color="success"
                 :active="$stateFilter === 'ok'"
+                accent
+                description="< 80% utilization"
                 wire:click="setStateFilter('ok')" />
 
             <x-nawasara-ui::stat-card
-                label="Warning (>= 80%)"
+                label="Warning"
                 :value="$this->summary['warning']"
-                icon="lucide-alert-triangle"
+                icon="lucide-triangle-alert"
                 color="warning"
                 :active="$stateFilter === 'warning'"
+                accent
+                description=">= 80% utilization"
                 wire:click="setStateFilter('warning')" />
 
             <x-nawasara-ui::stat-card
-                label="Critical (>= 95%)"
+                label="Critical"
                 :value="$this->summary['critical']"
-                icon="lucide-alert-circle"
+                icon="lucide-circle-alert"
                 color="danger"
                 :active="$stateFilter === 'critical'"
+                accent
+                description=">= 95% — perlu action"
                 wire:click="setStateFilter('critical')" />
         </div>
 
