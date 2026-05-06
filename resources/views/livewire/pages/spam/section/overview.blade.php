@@ -46,33 +46,32 @@
             </div>
             <x-nawasara-ui::skeleton-table :rows="6" :cols="5" />
         @else
-        {{-- Today's stats cards --}}
+        {{-- Today's stats — refactored to design-system stat-card.
+             Color tokens:
+             - Total: primary (informational summary)
+             - Auth Fail / RBL / Spam: danger (security failures yang
+               legitimate-blocked)
+             - Unknown User: warning (recipient typo / probe attempt)
+             - Other: neutral (uncategorized) --}}
         <h2 class="text-base font-semibold text-gray-900 dark:text-white mb-3">Rejected Hari Ini ({{ now()->format('d M Y') }})</h2>
+        @php
+            $cards = [
+                ['label' => 'Total', 'value' => $this->todayCounts['total'], 'color' => 'primary', 'icon' => 'lucide-shield-x'],
+                ['label' => 'Auth Fail', 'value' => $this->todayCounts['auth_fail'], 'color' => 'danger', 'icon' => 'lucide-key-round'],
+                ['label' => 'RBL Block', 'value' => $this->todayCounts['rbl'], 'color' => 'danger', 'icon' => 'lucide-list-x'],
+                ['label' => 'Unknown User', 'value' => $this->todayCounts['unknown_user'], 'color' => 'warning', 'icon' => 'lucide-user-x'],
+                ['label' => 'Spam', 'value' => $this->todayCounts['spam'], 'color' => 'danger', 'icon' => 'lucide-shield-alert'],
+                ['label' => 'Other', 'value' => $this->todayCounts['other'], 'color' => 'neutral', 'icon' => 'lucide-circle-help'],
+            ];
+        @endphp
         <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
-            @php
-                $cards = [
-                    ['label' => 'Total', 'value' => $this->todayCounts['total'], 'color' => 'gray', 'icon' => 'lucide-shield-x'],
-                    ['label' => 'Auth Fail', 'value' => $this->todayCounts['auth_fail'], 'color' => 'red', 'icon' => 'lucide-key-round'],
-                    ['label' => 'RBL Block', 'value' => $this->todayCounts['rbl'], 'color' => 'red', 'icon' => 'lucide-list-x'],
-                    ['label' => 'Unknown User', 'value' => $this->todayCounts['unknown_user'], 'color' => 'yellow', 'icon' => 'lucide-user-x'],
-                    ['label' => 'Spam', 'value' => $this->todayCounts['spam'], 'color' => 'red', 'icon' => 'lucide-shield-alert'],
-                    ['label' => 'Other', 'value' => $this->todayCounts['other'], 'color' => 'gray', 'icon' => 'lucide-circle-help'],
-                ];
-                $colorMap = [
-                    'gray' => 'bg-gray-50 text-gray-700 dark:bg-neutral-800 dark:text-neutral-300 border-gray-200 dark:border-neutral-700',
-                    'red' => 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400 border-red-200 dark:border-red-800',
-                    'yellow' => 'bg-yellow-50 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800',
-                    'blue' => 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400 border-blue-200 dark:border-blue-800',
-                ];
-            @endphp
             @foreach ($cards as $card)
-                <div class="p-4 rounded-xl border {{ $colorMap[$card['color']] }}">
-                    <div class="flex items-center gap-2 text-xs uppercase tracking-wide opacity-80">
-                        <x-dynamic-component :component="$card['icon']" class="size-4" />
-                        {{ $card['label'] }}
-                    </div>
-                    <div class="mt-2 text-2xl font-bold">{{ number_format($card['value']) }}</div>
-                </div>
+                <x-nawasara-ui::stat-card
+                    :label="$card['label']"
+                    :value="number_format($card['value'])"
+                    :icon="$card['icon']"
+                    :color="$card['color']"
+                    accent />
             @endforeach
         </div>
 

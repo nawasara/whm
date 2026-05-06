@@ -120,8 +120,13 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="6" class="px-6 py-8 text-center text-sm text-gray-500 dark:text-neutral-400">
-                            Tidak ada akun dengan status ini.
+                        <td colspan="6">
+                            <x-nawasara-ui::empty-state
+                                icon="lucide-search-x"
+                                title="Tidak ada akun dengan status ini"
+                                description="Coba klik kategori lain (Total/Healthy/Warning/Critical) di atas."
+                                variant="filter"
+                                inline />
                         </td>
                     </tr>
                 @endforelse

@@ -170,12 +170,23 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="8" class="px-6 py-8 text-center text-sm text-gray-500 dark:text-neutral-400">
+                        <td colspan="8">
                             @if (count($this->allItems) === 0)
-                                <x-lucide-inbox class="size-8 mx-auto text-gray-300 mb-2" />
-                                Mail queue kosong — tidak ada message tertunda.
+                                {{-- Celebratory empty state — queue kosong = good news,
+                                     berarti tidak ada email stuck/deferred di server. --}}
+                                <x-nawasara-ui::empty-state
+                                    icon="lucide-inbox"
+                                    title="Mail queue kosong"
+                                    description="Tidak ada message tertunda. Server email memproses delivery dengan lancar."
+                                    variant="celebrate"
+                                    inline />
                             @else
-                                Tidak ada message yang cocok filter ini.
+                                <x-nawasara-ui::empty-state
+                                    icon="lucide-search-x"
+                                    title="Tidak ada message yang cocok"
+                                    description="Coba ubah filter status atau hapus search keyword."
+                                    variant="filter"
+                                    inline />
                             @endif
                         </td>
                     </tr>

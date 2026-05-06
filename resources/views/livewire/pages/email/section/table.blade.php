@@ -113,11 +113,20 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="5" class="px-6 py-8 text-center text-sm text-gray-500 dark:text-neutral-400">
+                        <td colspan="5">
                             @if ($this->lastSyncedAt === null)
-                                Database masih kosong. Klik <strong>Sync Sekarang</strong> untuk fetch dari WHM.
+                                <x-nawasara-ui::empty-state
+                                    icon="lucide-mail"
+                                    title="Database mailbox masih kosong"
+                                    description="Klik tombol Sync Sekarang untuk fetch email account dari WHM server."
+                                    inline />
                             @else
-                                Tidak ada email account ditemukan untuk filter ini.
+                                <x-nawasara-ui::empty-state
+                                    icon="lucide-search-x"
+                                    title="Tidak ada mailbox yang cocok"
+                                    description="Coba ubah filter atau hapus search keyword."
+                                    variant="filter"
+                                    inline />
                             @endif
                         </td>
                     </tr>

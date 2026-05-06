@@ -49,34 +49,33 @@
                 @endfor
             </div>
         @else
-        {{-- Today's stats cards --}}
+        {{-- Today's stats cards — refactored to design-system stat-card.
+             Color mapping ke design tokens:
+             - Received: primary (informational, traffic count)
+             - Delivered: success (positive outcome)
+             - Bounced: danger (delivery failure)
+             - Deferred: warning (transient delay, akan retry)
+             - Spam: danger (security signal)
+             - Queue: info (operational, lagi diproses) --}}
         <h2 class="text-base font-semibold text-gray-900 dark:text-white mb-3">Hari Ini ({{ now()->format('d M Y') }})</h2>
+        @php
+            $cards = [
+                ['label' => 'Received', 'value' => $this->todayCounts['received'], 'color' => 'primary', 'icon' => 'lucide-arrow-down-to-line'],
+                ['label' => 'Delivered', 'value' => $this->todayCounts['delivered'], 'color' => 'success', 'icon' => 'lucide-circle-check'],
+                ['label' => 'Bounced', 'value' => $this->todayCounts['bounced'], 'color' => 'danger', 'icon' => 'lucide-circle-x'],
+                ['label' => 'Deferred', 'value' => $this->todayCounts['deferred'], 'color' => 'warning', 'icon' => 'lucide-clock'],
+                ['label' => 'Spam', 'value' => $this->todayCounts['spam'], 'color' => 'danger', 'icon' => 'lucide-shield-x'],
+                ['label' => 'Queue', 'value' => $this->queueSize, 'color' => 'info', 'icon' => 'lucide-inbox'],
+            ];
+        @endphp
         <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
-            @php
-                $cards = [
-                    ['label' => 'Received', 'value' => $this->todayCounts['received'], 'color' => 'blue', 'icon' => 'lucide-arrow-down-to-line'],
-                    ['label' => 'Delivered', 'value' => $this->todayCounts['delivered'], 'color' => 'green', 'icon' => 'lucide-check-circle'],
-                    ['label' => 'Bounced', 'value' => $this->todayCounts['bounced'], 'color' => 'red', 'icon' => 'lucide-x-circle'],
-                    ['label' => 'Deferred', 'value' => $this->todayCounts['deferred'], 'color' => 'yellow', 'icon' => 'lucide-clock'],
-                    ['label' => 'Spam', 'value' => $this->todayCounts['spam'], 'color' => 'red', 'icon' => 'lucide-shield-x'],
-                    ['label' => 'Queue', 'value' => $this->queueSize, 'color' => 'gray', 'icon' => 'lucide-inbox'],
-                ];
-                $colorMap = [
-                    'blue' => 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400 border-blue-200 dark:border-blue-800',
-                    'green' => 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400 border-green-200 dark:border-green-800',
-                    'red' => 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400 border-red-200 dark:border-red-800',
-                    'yellow' => 'bg-yellow-50 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800',
-                    'gray' => 'bg-gray-50 text-gray-700 dark:bg-neutral-800 dark:text-neutral-300 border-gray-200 dark:border-neutral-700',
-                ];
-            @endphp
             @foreach ($cards as $card)
-                <div class="p-4 rounded-xl border {{ $colorMap[$card['color']] }}">
-                    <div class="flex items-center gap-2 text-xs uppercase tracking-wide opacity-80">
-                        <x-dynamic-component :component="$card['icon']" class="size-4" />
-                        {{ $card['label'] }}
-                    </div>
-                    <div class="mt-2 text-2xl font-bold">{{ number_format($card['value']) }}</div>
-                </div>
+                <x-nawasara-ui::stat-card
+                    :label="$card['label']"
+                    :value="number_format($card['value'])"
+                    :icon="$card['icon']"
+                    :color="$card['color']"
+                    accent />
             @endforeach
         </div>
 
