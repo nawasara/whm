@@ -41,14 +41,7 @@
             title="Mail Queue"
             description="Antrian Exim per server WHM. Force delivery / freeze / bulk delete dari sini."
             :count="count($this->allItems).' total'">
-            <x-nawasara-ui::tooltip text="Refresh queue dari Exim" placement="bottom">
-                <button type="button" wire:click="refresh"
-                    wire:loading.attr="disabled" wire:target="refresh"
-                    aria-label="Refresh"
-                    class="inline-flex items-center justify-center size-10 rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-700 shadow-sm transition-colors disabled:opacity-50 disabled:pointer-events-none">
-                    <x-lucide-refresh-cw class="size-4" wire:loading.class="animate-spin" wire:target="refresh" />
-                </button>
-            </x-nawasara-ui::tooltip>
+            <x-nawasara-ui::icon-button icon="refresh-cw" tooltip="Refresh queue dari Exim" wire:click="refresh" loadingTarget="refresh" />
 
             @can('whm.mailqueue.manage')
                 <x-nawasara-ui::button color="warning" variant="outline" size="sm"
@@ -88,14 +81,7 @@
                     </x-nawasara-ui::filter-panel>
                 </div>
 
-                <div class="relative w-full md:flex-1 md:min-w-0">
-                    <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none ps-3.5">
-                        <x-lucide-search class="shrink-0 size-4 text-gray-400 dark:text-neutral-500" />
-                    </div>
-                    <input type="text" wire:model.live.debounce.300ms="search"
-                        placeholder="Cari queue id, sender, atau recipient..."
-                        class="h-10 ps-10 pe-4 block w-full border border-gray-200 rounded-lg text-sm focus:border-emerald-600 focus:ring-emerald-600 dark:bg-neutral-900 dark:border-neutral-700 dark:text-neutral-200 dark:placeholder-neutral-500 dark:focus:ring-neutral-600" />
-                </div>
+                <x-nawasara-ui::search-input model="search" placeholder="Cari queue id, sender, atau recipient..." />
             </div>
 
             <div wire:ignore data-filter-chips></div>
