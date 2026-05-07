@@ -25,8 +25,23 @@ class Table extends Component
     public string $server = '';
 
     public string $search = '';
-    public string $statusFilter = '';
+
+    /**
+     * Multi-select status filter (filter-panel array semantics).
+     * Empty array == no filter. queued/deferred/frozen are mutually
+     * exclusive Exim states so multi-select == "match any".
+     *
+     * @var array<int, string>
+     */
+    public array $statusFilter = [];
+
+    /**
+     * Single-select age threshold ('1h' / '24h' / '7d' / '').
+     * Stays scalar because the underlying filter is "older than X" — a
+     * monotonic threshold, not a multi-value dimension.
+     */
     public string $ageFilter = '';
+
     public int $perPage = 50;
     public int $page = 1;
 
@@ -124,8 +139,11 @@ class Table extends Component
             }));
         }
 
-        if ($this->statusFilter !== '') {
-            $items = array_values(array_filter($items, fn ($i) => $i['status'] === $this->statusFilter));
+        if (! empty($this->statusFilter)) {
+            $items = array_values(array_filter(
+                $items,
+                fn ($i) => in_array($i['status'], $this->statusFilter, true),
+            ));
         }
 
         if ($this->ageFilter !== '') {

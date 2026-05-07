@@ -10,6 +10,7 @@ use Livewire\Component;
 use Livewire\WithPagination;
 use Nawasara\Registry\Models\Asset;
 use Nawasara\Ui\Livewire\Concerns\HasBrowserToast;
+use Nawasara\Ui\Livewire\Concerns\HasExport;
 use Nawasara\Whm\Livewire\Concerns\HasServerRole;
 use Nawasara\Whm\Models\WhmAccount;
 use Nawasara\Whm\Repositories\WhmAccountRepository;
@@ -18,6 +19,7 @@ use Nawasara\Whm\Services\WhmClient;
 class Table extends Component
 {
     use HasBrowserToast;
+    use HasExport;
     use HasServerRole;
     use WithPagination;
 
@@ -30,8 +32,18 @@ class Table extends Component
     public string $server = '';
 
     public string $search = '';
-    public string $statusFilter = '';
-    public string $packageFilter = '';
+
+    /**
+     * Multi-select filters (filter-panel array semantics). Empty array
+     * == no filter. Underlying scopes are polymorphic.
+     *
+     * @var array<int, string>
+     */
+    public array $statusFilter = [];
+
+    /** @var array<int, string> */
+    public array $packageFilter = [];
+
     public int $perPage = 25;
 
     // Form modal state (create)
@@ -96,8 +108,9 @@ class Table extends Component
     {
         return $this->repo()->list([
             'search' => $this->search ?: null,
-            'status' => $this->statusFilter ?: null,
-            'plan' => $this->packageFilter ?: null,
+            // Empty arrays pass through; polymorphic scopes are no-op on empty.
+            'status' => $this->statusFilter,
+            'plan' => $this->packageFilter,
         ], $this->perPage);
     }
 
@@ -403,6 +416,59 @@ class Table extends Component
 
         $this->toastSuccess("Unsuspend dispatched untuk {$count} akun.");
         $this->resetSelection();
+    }
+
+    /**
+     * Export filename base — timestamp + extension appended by HasExport.
+     * Includes the active server slug so multi-instance setups don't clash.
+     */
+    protected function exportFilename(): string
+    {
+        $slug = $this->server ?: 'all';
+        return 'whm-accounts-'.preg_replace('/[^a-z0-9-]+/i', '-', $slug);
+    }
+
+    /**
+     * Export FULL account list for the active server (no filter) per spec.
+     * Includes registry-mapped OPD/PIC for downstream audit.
+     */
+    protected function exportData(): iterable
+    {
+        $accounts = WhmAccount::forInstance($this->server)
+            ->orderBy('username')
+            ->get();
+
+        // Pull asset map keyed by username so we don't N+1 over the row map.
+        $assetMap = Asset::query()
+            ->where('package_ref', 'whm')
+            ->whereIn('external_id', $accounts->pluck('username')->filter()->all())
+            ->with(['opd:id,name,code', 'pic:id,name'])
+            ->get()
+            ->keyBy('external_id');
+
+        return $accounts->map(function (WhmAccount $a) use ($assetMap) {
+            $asset = $assetMap[$a->username] ?? null;
+            return [
+                'Server' => $a->instance,
+                'Username' => $a->username,
+                'Domain' => $a->domain,
+                'Email' => $a->email,
+                'Plan' => $a->plan,
+                'Status' => $a->suspended ? 'Suspended' : 'Active',
+                'Suspend Reason' => $a->suspend_reason,
+                'IP' => $a->ip,
+                'Owner' => $a->owner,
+                'Disk Used MB' => $a->disk_used_mb,
+                'Disk Limit MB' => $a->disk_limit_mb,
+                'Bandwidth Used MB' => $a->bandwidth_used_mb,
+                'Bandwidth Limit MB' => $a->bandwidth_limit_mb,
+                'Inodes Used' => $a->inodes_used,
+                'OPD' => $asset?->opd?->name,
+                'PIC' => $asset?->pic?->name,
+                'WHM Created' => optional($a->start_date)->format('Y-m-d'),
+                'Last Synced' => optional($a->last_synced_at)->format('Y-m-d H:i'),
+            ];
+        });
     }
 
     public function render()

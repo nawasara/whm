@@ -106,16 +106,45 @@ class WhmAccount extends Model
         });
     }
 
-    public function scopeStatus($query, ?string $status)
+    /**
+     * Polymorphic active/suspended filter. Backed by the boolean `suspended`
+     * column with semantic strings ('active' / 'suspended'). Selecting
+     * BOTH is a no-op (every row matches).
+     *
+     * @param  string|array<int,string>|null  $status
+     */
+    public function scopeStatus($query, string|array|null $status)
     {
-        if (! $status) return $query;
-        if ($status === 'suspended') return $query->where('suspended', true);
-        if ($status === 'active') return $query->where('suspended', false);
+        if (empty($status)) {
+            return $query;
+        }
+
+        $values = is_array($status) ? $status : [$status];
+        $wantActive = in_array('active', $values, true);
+        $wantSuspended = in_array('suspended', $values, true);
+
+        if ($wantActive && ! $wantSuspended) {
+            return $query->where('suspended', false);
+        }
+        if ($wantSuspended && ! $wantActive) {
+            return $query->where('suspended', true);
+        }
         return $query;
     }
 
-    public function scopePlan($query, ?string $plan)
+    /**
+     * Polymorphic plan filter. Accepts string for single match or
+     * array<string> for multi-select.
+     *
+     * @param  string|array<int,string>|null  $plan
+     */
+    public function scopePlan($query, string|array|null $plan)
     {
-        return $plan ? $query->where('plan', $plan) : $query;
+        if (empty($plan)) {
+            return $query;
+        }
+        return is_array($plan)
+            ? $query->whereIn('plan', $plan)
+            : $query->where('plan', $plan);
     }
 }

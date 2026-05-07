@@ -4,20 +4,9 @@
             :items="[['label' => 'WHM Hosting', 'url' => '#'], ['label' => 'Email Accounts']]" />
     </x-slot>
 
+    {{-- Title + Tambah Email action hoisted into the section component
+         (which owns the server-switcher + form modals). Index is a shell. --}}
     <x-nawasara-ui::page.container>
-        <x-nawasara-ui::page.title>Email Accounts</x-nawasara-ui::page.title>
-
-        <x-slot name="actions">
-            <x-nawasara-ui::page.actions>
-                <x-nawasara-ui::button wire:click="$dispatch('openCreateEmail')" color="success"
-                    @click="$dispatch('open-modal', 'whm-email-form')"
-                    permission="whm.email.create">
-                    <x-slot:icon><x-lucide-plus class="size-4" /></x-slot:icon>
-                    Tambah Email
-                </x-nawasara-ui::button>
-            </x-nawasara-ui::page.actions>
-        </x-slot>
-
         @livewire('nawasara-whm.email.section.table')
     </x-nawasara-ui::page.container>
 </div>

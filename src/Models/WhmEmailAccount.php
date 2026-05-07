@@ -69,19 +69,32 @@ class WhmEmailAccount extends Model
         });
     }
 
-    public function scopeStatus($query, ?string $status)
+    /**
+     * Polymorphic active/suspended filter. Email is "suspended" if either
+     * suspended_login OR suspended_incoming is true. Selecting BOTH
+     * 'active' and 'suspended' is a no-op (every row matches).
+     *
+     * @param  string|array<int,string>|null  $status
+     */
+    public function scopeStatus($query, string|array|null $status)
     {
-        // 'active' or 'suspended'
-        if (! $status) return $query;
-        if ($status === 'suspended') {
+        if (empty($status)) {
+            return $query;
+        }
+
+        $values = is_array($status) ? $status : [$status];
+        $wantActive = in_array('active', $values, true);
+        $wantSuspended = in_array('suspended', $values, true);
+
+        if ($wantActive && ! $wantSuspended) {
+            return $query->where('suspended_login', false)
+                ->where('suspended_incoming', false);
+        }
+        if ($wantSuspended && ! $wantActive) {
             return $query->where(function ($q) {
                 $q->where('suspended_login', true)
                     ->orWhere('suspended_incoming', true);
             });
-        }
-        if ($status === 'active') {
-            return $query->where('suspended_login', false)
-                ->where('suspended_incoming', false);
         }
         return $query;
     }

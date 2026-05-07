@@ -10,6 +10,7 @@ use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Nawasara\Ui\Livewire\Concerns\HasBrowserToast;
+use Nawasara\Ui\Livewire\Concerns\HasExport;
 use Nawasara\Whm\Livewire\Concerns\HasServerRole;
 use Nawasara\Whm\Models\WhmEmailAccount;
 use Nawasara\Whm\Repositories\WhmEmailAccountRepository;
@@ -18,6 +19,7 @@ use Nawasara\Whm\Services\WhmClient;
 class Table extends Component
 {
     use HasBrowserToast;
+    use HasExport;
     use HasServerRole;
     use WithPagination;
 
@@ -30,7 +32,14 @@ class Table extends Component
     public string $server = '';
 
     public string $search = '';
-    public string $statusFilter = '';
+
+    /**
+     * Multi-select status filter (filter-panel array semantics).
+     * Empty array == no filter; both selected == no-op (any row matches).
+     *
+     * @var array<int, string>
+     */
+    public array $statusFilter = [];
 
     public int $perPage = 25;
 
@@ -128,7 +137,8 @@ class Table extends Component
     {
         return $this->repo()->list([
             'search' => $this->search ?: null,
-            'status' => $this->statusFilter ?: null,
+            // Empty array passes through; polymorphic scope is no-op on empty.
+            'status' => $this->statusFilter,
         ], $this->perPage);
     }
 
@@ -432,6 +442,40 @@ class Table extends Component
         $this->toastSuccess("Quota update dispatched untuk {$count} email.");
         $this->dispatch('modal-close:whm-email-bulk-quota');
         $this->resetSelection();
+    }
+
+    /**
+     * Export filename base — timestamp + extension appended by HasExport.
+     */
+    protected function exportFilename(): string
+    {
+        $slug = $this->server ?: 'all';
+        return 'whm-email-accounts-'.preg_replace('/[^a-z0-9-]+/i', '-', $slug);
+    }
+
+    /**
+     * Export FULL email account list for the active server (no filter).
+     * Dual suspended flags exposed verbatim because operators distinguish
+     * "can't login" from "can't receive" in incident triage.
+     */
+    protected function exportData(): iterable
+    {
+        return WhmEmailAccount::forInstance($this->server)
+            ->orderBy('domain')
+            ->orderBy('local_part')
+            ->get()
+            ->map(fn (WhmEmailAccount $a) => [
+                'Server' => $a->instance,
+                'cPanel User' => $a->cpanel_user,
+                'Email' => $a->email,
+                'Local Part' => $a->local_part,
+                'Domain' => $a->domain,
+                'Quota MB' => $a->quota_mb,
+                'Disk Used MB' => $a->disk_used_mb,
+                'Suspended Login' => $a->suspended_login ? 'Yes' : 'No',
+                'Suspended Incoming' => $a->suspended_incoming ? 'Yes' : 'No',
+                'Last Synced' => optional($a->last_synced_at)->format('Y-m-d H:i'),
+            ]);
     }
 
     public function render()

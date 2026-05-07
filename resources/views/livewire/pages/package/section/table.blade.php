@@ -5,13 +5,38 @@
             <p class="mt-3 text-sm text-gray-700 dark:text-neutral-300 font-medium">Belum ada server WHM dikonfigurasi</p>
         </div>
     @else
-        <x-nawasara-ui::filter-bar searchPlaceholder="Cari nama package..." searchModel="search">
-            <x-nawasara-whm::server-switcher :servers="$this->servers" role="hosting" />
-        </x-nawasara-ui::filter-bar>
+        {{-- Page header — title + Tambah Package. Packages are live data
+             from WHM API; no export (small dataset, source-of-truth at
+             WHM dashboard). --}}
+        <x-nawasara-ui::page-header
+            title="Hosting Packages"
+            description="Hosting package definition di server WHM. Hapus package gagal kalau masih dipakai akun."
+            :count="count($this->packages).' packages'">
+            @can('whm.package.manage')
+                <x-nawasara-ui::button wire:click="$dispatch('openCreatePackage')" color="success"
+                    @click="$dispatch('open-modal', 'whm-package-form')">
+                    <x-slot:icon><x-lucide-plus class="size-4" /></x-slot:icon>
+                    Tambah Package
+                </x-nawasara-ui::button>
+            @endcan
+        </x-nawasara-ui::page-header>
 
-        <x-nawasara-ui::table
-            :headers="['Nama', 'Disk', 'Bandwidth', 'Email', 'FTP', 'SQL', 'Subdomain', '']"
-            :title="'Packages (' . count($this->packages) . ')'">
+        {{-- Server selector + search. Server is hard scope. --}}
+        <div class="flex flex-wrap items-center gap-3 mb-4">
+            <x-nawasara-whm::server-switcher :servers="$this->servers" role="hosting" />
+        </div>
+
+        <div class="relative w-full mb-4">
+            <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none ps-3.5">
+                <x-lucide-search class="shrink-0 size-4 text-gray-400 dark:text-neutral-500" />
+            </div>
+            <input type="text" wire:model.live.debounce.300ms="search"
+                placeholder="Cari nama package..."
+                class="h-10 ps-10 pe-4 block w-full border border-gray-200 rounded-lg text-sm focus:border-emerald-600 focus:ring-emerald-600 dark:bg-neutral-900 dark:border-neutral-700 dark:text-neutral-200 dark:placeholder-neutral-500 dark:focus:ring-neutral-600" />
+        </div>
+
+        <x-nawasara-ui::table stickyLast
+            :headers="['Nama', 'Disk', 'Bandwidth', 'Email', 'FTP', 'SQL', 'Subdomain', '']">
             <x-slot:table>
                 @forelse ($this->packages as $pkg)
                     <tr>
