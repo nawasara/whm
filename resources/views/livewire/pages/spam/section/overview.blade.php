@@ -185,12 +185,15 @@
                         <tbody class="divide-y divide-gray-100 dark:divide-neutral-700">
                             @foreach ($this->recent as $r)
                                 @php
+                                    // Spam log category color tokens. auth_fail = red
+                                    // (sec event); rbl = purple (3rd-party block);
+                                    // unknown_user = warning; spam = orange.
                                     $catColor = match($r['category']) {
-                                        'auth_fail' => 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-                                        'rbl' => 'bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
-                                        'unknown_user' => 'bg-yellow-50 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
-                                        'spam' => 'bg-orange-50 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
-                                        default => 'bg-gray-100 text-gray-700 dark:bg-neutral-700 dark:text-neutral-300',
+                                        'auth_fail' => 'red',
+                                        'rbl' => 'purple',
+                                        'unknown_user' => 'warning',
+                                        'spam' => 'orange',
+                                        default => 'neutral',
                                     };
                                     $catLabel = match($r['category']) {
                                         'auth_fail' => 'Auth Fail',
@@ -203,7 +206,7 @@
                                 <tr>
                                     <td class="py-2 pr-3 font-mono text-xs text-gray-500 dark:text-neutral-400 whitespace-nowrap">{{ $r['timestamp'] }}</td>
                                     <td class="py-2 pr-3">
-                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {{ $catColor }}">{{ $catLabel }}</span>
+                                        <x-nawasara-ui::badge :color="$catColor">{{ $catLabel }}</x-nawasara-ui::badge>
                                     </td>
                                     <td class="py-2 pr-3 font-mono text-xs text-gray-700 dark:text-neutral-300">{{ $r['ip'] ?? '-' }}</td>
                                     <td class="py-2 pr-3 font-mono text-xs text-gray-700 dark:text-neutral-300 truncate max-w-xs" title="{{ $r['user'] }}">{{ $r['user'] ?? '-' }}</td>
