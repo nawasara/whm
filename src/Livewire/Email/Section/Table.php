@@ -3,17 +3,21 @@
 namespace Nawasara\Whm\Livewire\Email\Section;
 
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
+use Nawasara\Core\Models\WebmailSession;
 use Nawasara\Ui\Livewire\Concerns\HasBrowserToast;
 use Nawasara\Ui\Livewire\Concerns\HasExport;
+use Nawasara\Whm\Exceptions\WebmailSessionException;
 use Nawasara\Whm\Livewire\Concerns\HasServerRole;
 use Nawasara\Whm\Models\WhmEmailAccount;
 use Nawasara\Whm\Repositories\WhmEmailAccountRepository;
+use Nawasara\Whm\Services\WebmailSessionService;
 use Nawasara\Whm\Services\WhmClient;
 
 class Table extends Component
@@ -69,6 +73,13 @@ class Table extends Component
 
     // Bulk password modal (single password applied to all selected)
     public string $bulkNewPassword = '';
+
+    // Launch-as (admin impersonation) modal state. Sengaja terpisah dari
+    // password/quota modal supaya state tidak bocor antar flow — admin yang
+    // baru saja edit password bisa langsung klik "Buka sebagai" tanpa stale
+    // form data.
+    public string $launchAsEmail = '';
+    public string $launchAsReason = '';
 
     protected WhmClient $whm;
 
@@ -305,6 +316,161 @@ class Table extends Component
             $this->toastSuccess("Delete dispatched untuk {$email}.");
         } catch (\Throwable $e) {
             $this->toastError($e->getMessage());
+        }
+    }
+
+    // ─── Launch as (admin impersonation) ────────────────
+
+    /**
+     * Buka modal konfirmasi sebelum admin masuk ke webmail user.
+     * Reason wajib diisi supaya audit trail actionable — atasan harus tahu
+     * kenapa email user X diakses oleh admin Y.
+     *
+     * Permission check di sini PLUS di submit handler — defense in depth,
+     * jangan cuma di submit (kalau user manipulasi DOM, modal masih bisa
+     * kebuka tapi submit akan ditolak).
+     */
+    public function openLaunchAs(string $email): void
+    {
+        Gate::authorize('webmail.session.launch_as');
+
+        $this->launchAsEmail = $email;
+        $this->launchAsReason = '';
+        $this->resetErrorBag('launchAsReason');
+
+        $this->dispatch('modal-open:whm-email-launch-as');
+    }
+
+    /**
+     * Forge session URL untuk mailbox target + redirect admin browser ke
+     * Roundcube. Audit log inserted dulu sebelum redirect supaya kalau
+     * redirect gagal di tengah jalan, jejaknya tetap ada.
+     *
+     * Kenapa Livewire yang return redirect (bukan controller terpisah):
+     *   - Action ini single-step, tidak ada GET vs POST distinction
+     *   - State (email + reason) sudah ada di Livewire component
+     *   - Mengikuti pattern Livewire 3: `return redirect()->away(...)` di
+     *     action method legal dan di-handle properly oleh Livewire
+     */
+    public function confirmLaunchAs(WebmailSessionService $service)
+    {
+        Gate::authorize('webmail.session.launch_as');
+
+        $this->validate([
+            'launchAsEmail' => 'required|email',
+            'launchAsReason' => 'required|string|min:10|max:500',
+        ], [], [
+            'launchAsReason' => 'alasan akses',
+        ]);
+
+        $email = $this->launchAsEmail;
+        $reason = trim($this->launchAsReason);
+
+        // Resolve target user (kalau email ke-link ke user Nawasara). Best-effort
+        // — kalau tidak ke-link, tetap log dengan target_user_id null. Audit
+        // page bisa filter "akses email yang tidak terhubung user" kalau perlu.
+        $targetUserId = $this->resolveTargetUserId($email);
+
+        $instance = $this->server ?: null;
+
+        try {
+            $result = $service->createWebmailUrl($email, $instance);
+        } catch (WebmailSessionException $e) {
+            $this->logImpersonationAttempt(
+                email: $email,
+                reason: $reason,
+                targetUserId: $targetUserId,
+                status: WebmailSession::STATUS_FAILED,
+                error: $e->getMessage(),
+            );
+
+            Log::warning('[webmail] admin launch-as failed', [
+                'admin_id' => auth()->id(),
+                'target_email' => $email,
+                'message' => $e->getMessage(),
+            ]);
+
+            $this->dispatch('modal-close:whm-email-launch-as');
+            $this->toastError('Gagal forge session: '.$e->getMessage());
+            return null;
+        }
+
+        $this->logImpersonationAttempt(
+            email: $email,
+            reason: $reason,
+            targetUserId: $targetUserId,
+            status: WebmailSession::STATUS_ISSUED,
+            error: null,
+        );
+
+        // Redirect tab BARU akan di-handle browser-side via JS (target=_blank).
+        // Livewire `redirect()->away()` akan navigate current tab. Untuk admin
+        // yang lagi mid-task tidak ideal, jadi kita dispatch event ke JS yang
+        // window.open() di tab baru. Modal close sekaligus.
+        $this->dispatch('modal-close:whm-email-launch-as');
+        $this->dispatch('webmail-launch-window', url: $result['url'], expiresIn: $result['expires_in']);
+
+        return null;
+    }
+
+    /**
+     * Lookup user yang punya UserEmailLink ke mailbox ini. Best-effort:
+     * - Manual link menang atas SSO link kalau dua-duanya ada
+     * - Kalau >1 user link ke email yang sama (rare, biasanya admin set
+     *   shared mailbox), pakai yang paling baru di-update
+     *
+     * Return null kalau email tidak ke-link ke siapapun — itu OK, audit log
+     * tetap bisa di-insert dengan user_id null (admin akses email "yatim").
+     */
+    protected function resolveTargetUserId(string $email): ?int
+    {
+        // Lazy import — kalau nawasara-core belum loaded, jangan crash. Tapi
+        // realistically nawasara-whm depend ke nawasara-core, jadi kondisi ini
+        // hampir tidak mungkin. Defensive aja.
+        $linkClass = \Nawasara\Core\Models\UserEmailLink::class;
+        if (! class_exists($linkClass)) {
+            return null;
+        }
+
+        $link = $linkClass::query()
+            ->where('email_account', $email)
+            ->orderByRaw("CASE WHEN source = 'manual' THEN 0 ELSE 1 END")
+            ->orderByDesc('updated_at')
+            ->first();
+
+        return $link?->user_id;
+    }
+
+    /**
+     * Insert audit row untuk impersonation attempt. Kalau insert sendiri
+     * gagal (DB issue), log warning tapi JANGAN throw — admin tetap perlu
+     * dapet redirect / error feedback untuk action utamanya.
+     */
+    protected function logImpersonationAttempt(
+        string $email,
+        string $reason,
+        ?int $targetUserId,
+        string $status,
+        ?string $error,
+    ): void {
+        try {
+            WebmailSession::create([
+                'user_id' => $targetUserId,                    // target (boleh null)
+                'acted_by_user_id' => auth()->id(),            // admin yang launch
+                'email_account' => $email,
+                'match_strategy' => null,                      // N/A untuk impersonation
+                'launch_kind' => WebmailSession::KIND_IMPERSONATION,
+                'reason' => $reason,
+                'ip' => request()->ip(),
+                'user_agent' => substr((string) request()->userAgent(), 0, 500),
+                'status' => $status,
+                'error' => $error,
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('[webmail] impersonation audit log failed: '.$e->getMessage(), [
+                'admin_id' => auth()->id(),
+                'target_email' => $email,
+            ]);
         }
     }
 

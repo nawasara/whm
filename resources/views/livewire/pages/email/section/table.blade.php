@@ -130,6 +130,10 @@
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-right">
                             <x-nawasara-ui::dropdown-menu-action :id="$acct->id" :items="[
                                 ['type' => 'click', 'label' => 'Detail', 'wire:click' => 'openDetail('.$acct->id.')', 'modal' => 'whm-email-detail', 'icon' => 'lucide-eye', 'permission' => 'whm.email.view'],
+                                // Admin impersonation — launch Roundcube sebagai user pemilik mailbox.
+                                // Permission terpisah (webmail.session.launch_as) supaya bisa di-grant
+                                // ke admin tertentu tanpa kasih full whm.email.manage.
+                                ['type' => 'click', 'label' => 'Buka Webmail', 'wire:click' => 'openLaunchAs(\'' . $acct->email . '\')', 'modal' => 'whm-email-launch-as', 'icon' => 'lucide-external-link', 'permission' => 'webmail.session.launch_as'],
                                 ['type' => 'click', 'label' => 'Change Password', 'wire:click' => 'openChangePassword(\'' . $acct->email . '\')', 'modal' => 'whm-email-password', 'icon' => 'lucide-key-round', 'permission' => 'whm.email.manage'],
                                 ['type' => 'click', 'label' => 'Change Quota', 'wire:click' => 'openChangeQuota(\'' . $acct->email . '\', '.($acct->quota_mb ?: 0).')', 'modal' => 'whm-email-quota', 'icon' => 'lucide-database', 'permission' => 'whm.email.manage'],
                                 $acct->isSuspended()
@@ -266,6 +270,65 @@
             <x-nawasara-ui::button type="submit" form="whm-email-bulk-quota-form" color="primary">Apply ke Semua</x-nawasara-ui::button>
         </x-slot:footer>
     </x-nawasara-ui::modal>
+
+    {{-- Launch-as (Admin Impersonation) Modal — buka Roundcube sebagai pemilik
+         mailbox tanpa tahu password mereka. Wajib isi alasan supaya audit
+         trail actionable. URL session di-buka di tab BARU lewat JS event
+         `webmail-launch-window` (lihat <script> di bawah) supaya admin tidak
+         kehilangan context Nawasara. --}}
+    <x-nawasara-ui::modal id="whm-email-launch-as" maxWidth="lg" :title="'Buka Webmail: '.$launchAsEmail">
+        <form wire:submit="confirmLaunchAs" id="whm-email-launch-as-form" class="space-y-4">
+            <div class="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800/50 p-3 text-sm text-amber-800 dark:text-amber-200">
+                <div class="flex gap-2">
+                    <x-lucide-shield-alert class="size-5 shrink-0 mt-0.5" />
+                    <div>
+                        <p class="font-medium">Anda akan masuk ke webmail sebagai pemilik <code class="font-mono">{{ $launchAsEmail }}</code>.</p>
+                        <p class="mt-1 text-xs">Akses ini dicatat dalam audit log dengan timestamp, IP, dan alasan yang Anda isi. Atasan dapat melihat aktivitas ini.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <x-nawasara-ui::form.label>
+                    Alasan akses <span class="text-red-500">*</span>
+                </x-nawasara-ui::form.label>
+                <textarea wire:model="launchAsReason" rows="3"
+                    class="block w-full rounded-lg border-gray-200 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-200 text-sm focus:border-emerald-600 focus:ring-emerald-600"
+                    placeholder="Contoh: User meminta bantuan reset filter spam yang block email penting"></textarea>
+                @error('launchAsReason')
+                    <p class="text-xs text-red-600 dark:text-red-400 mt-1">{{ $message }}</p>
+                @enderror
+                <p class="text-xs text-gray-500 dark:text-neutral-400 mt-1">Minimal 10 karakter. Semakin spesifik semakin baik untuk audit.</p>
+            </div>
+        </form>
+
+        <x-slot:footer>
+            <x-nawasara-ui::button color="neutral" variant="outline" @click="$dispatch('close-modal', 'whm-email-launch-as')">Batal</x-nawasara-ui::button>
+            <x-nawasara-ui::button type="submit" form="whm-email-launch-as-form" color="warning">
+                <x-slot:icon><x-lucide-external-link /></x-slot:icon>
+                Buka Webmail
+            </x-nawasara-ui::button>
+        </x-slot:footer>
+    </x-nawasara-ui::modal>
+
+    {{-- JS bridge: buka URL session di tab baru, tidak navigate current tab.
+         Pakai `webmail-launch-window` event dari Livewire — Alpine listener
+         di-attach ke window supaya tidak tergantung component DOM. --}}
+    <script>
+        document.addEventListener('livewire:init', () => {
+            Livewire.on('webmail-launch-window', (event) => {
+                // Livewire 3 dispatch shape: event[0] = first arg as object
+                // (named args jadi keys). Kalau struktur berubah, defensif:
+                const payload = Array.isArray(event) ? event[0] : event;
+                const url = payload?.url;
+                if (!url) return;
+
+                // noopener supaya tab baru tidak punya reference ke window.opener —
+                // best practice security untuk eksternal redirect.
+                window.open(url, '_blank', 'noopener,noreferrer');
+            });
+        });
+    </script>
 
     {{-- Detail Modal --}}
     <x-nawasara-ui::modal id="whm-email-detail" maxWidth="lg" :title="'Detail: '.($this->detail->email ?? '')">

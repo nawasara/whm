@@ -14,6 +14,7 @@ use Nawasara\Whm\Services\EmailStatsAggregator;
 use Nawasara\Whm\Services\EximClient;
 use Nawasara\Whm\Services\MailSecurityAggregator;
 use Nawasara\Whm\Services\SshConnection;
+use Nawasara\Whm\Services\WebmailSessionService;
 use Nawasara\Whm\Services\WhmClient;
 
 class WhmServiceProvider extends ServiceProvider
@@ -69,6 +70,14 @@ class WhmServiceProvider extends ServiceProvider
         $this->app->singleton(EximClient::class, fn ($app) => new EximClient($app->make(SshConnection::class)));
         $this->app->singleton(EmailStatsAggregator::class, fn ($app) => new EmailStatsAggregator($app->make(SshConnection::class)));
         $this->app->singleton(MailSecurityAggregator::class, fn ($app) => new MailSecurityAggregator($app->make(SshConnection::class)));
+
+        // WebmailSessionService = thin orchestrator over WhmClient untuk forge
+        // one-shot session URL via WHM `create_user_session`. Dipakai oleh:
+        //   - Self-launch user-facing (WebmailLaunchController di nawasara-core)
+        //   - Admin impersonation (AdminWebmailLaunchController di nawasara-whm)
+        $this->app->singleton(WebmailSessionService::class, fn ($app) => new WebmailSessionService(
+            $app->make(WhmClient::class),
+        ));
     }
 
     public function registerLivewire(): void

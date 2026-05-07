@@ -46,6 +46,12 @@ class PermissionSeeder extends Seeder
 
             // Webmail session (create_user_session API)
             'whm.session.create',
+
+            // Admin impersonation: buka webmail user manapun tanpa tahu password.
+            // Sensitive — JANGAN di-attach ke role default. Manual assign per user
+            // admin via Setting → Role Management. Audit log mandatory di
+            // nawasara_webmail_sessions (launch_kind=impersonation, reason wajib).
+            'webmail.session.launch_as',
         ];
 
         foreach ($permissions as $permission) {
