@@ -52,6 +52,14 @@ class PermissionSeeder extends Seeder
             // admin via Setting → Role Management. Audit log mandatory di
             // nawasara_webmail_sessions (launch_kind=impersonation, reason wajib).
             'webmail.session.launch_as',
+
+            // Admin impersonation: buka cPanel akun user manapun tanpa tahu
+            // password. Sister-permission dari webmail.session.launch_as tapi
+            // grant terpisah karena cPanel = full hosting control (file manager,
+            // DB access, dll) sedangkan webmail cuma read/send email. Admin
+            // bisa punya akses webmail tapi tidak cPanel, atau sebaliknya.
+            // Audit di nawasara_cpanel_sessions, reason wajib min 10 char.
+            'cpanel.session.launch_as',
         ];
 
         foreach ($permissions as $permission) {

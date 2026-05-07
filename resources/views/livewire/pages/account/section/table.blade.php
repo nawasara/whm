@@ -158,6 +158,10 @@
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-right">
                             <x-nawasara-ui::dropdown-menu-action :id="$acct->id" :items="[
                                 ['type' => 'click', 'label' => 'Detail', 'wire:click' => 'openDetail('.$acct->id.')', 'modal' => 'whm-account-detail', 'icon' => 'lucide-eye', 'permission' => 'whm.account.view'],
+                                // Admin impersonation — launch cPanel sebagai pemilik akun.
+                                // Permission terpisah (cpanel.session.launch_as) supaya bisa di-grant
+                                // ke admin tertentu tanpa kasih full whm.account.manage.
+                                ['type' => 'click', 'label' => 'Buka cPanel', 'wire:click' => 'openLaunchAs(\'' . $acct->username . '\', \'' . addslashes($acct->domain ?? '') . '\')', 'modal' => 'whm-account-launch-as', 'icon' => 'lucide-external-link', 'permission' => 'cpanel.session.launch_as'],
                                 ['type' => 'click', 'label' => 'Change Password', 'wire:click' => 'openChangePassword(\'' . $acct->username . '\')', 'modal' => 'whm-password', 'icon' => 'lucide-key-round', 'permission' => 'whm.account.manage'],
                                 $acct->suspended
                                     ? ['type' => 'click', 'label' => 'Unsuspend', 'wire:click' => 'unsuspend(\'' . $acct->username . '\')', 'icon' => 'lucide-play', 'permission' => 'whm.account.suspend']
@@ -306,6 +310,62 @@
             <x-nawasara-ui::button type="submit" form="whm-bulk-suspend-form" color="danger">Suspend Semua</x-nawasara-ui::button>
         </x-slot:footer>
     </x-nawasara-ui::modal>
+
+    {{-- Launch-as (Admin Impersonation) Modal — buka cPanel sebagai pemilik
+         akun tanpa tahu password mereka. Wajib isi alasan supaya audit trail
+         actionable. URL session di-buka di tab BARU lewat JS event
+         `cpanel-launch-window` (lihat <script> di bawah) supaya admin tidak
+         kehilangan context Nawasara. --}}
+    <x-nawasara-ui::modal id="whm-account-launch-as" maxWidth="lg" :title="'Buka cPanel: '.$launchAsUsername">
+        <form wire:submit="confirmLaunchAs" id="whm-account-launch-as-form" class="space-y-4">
+            <div class="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800/50 p-3 text-sm text-amber-800 dark:text-amber-200">
+                <div class="flex gap-2">
+                    <x-lucide-shield-alert class="size-5 shrink-0 mt-0.5" />
+                    <div>
+                        <p class="font-medium">
+                            Anda akan masuk ke cPanel sebagai <code class="font-mono">{{ $launchAsUsername }}</code>@if ($launchAsDomain) ({{ $launchAsDomain }})@endif.
+                        </p>
+                        <p class="mt-1 text-xs">Akses ini dicatat dalam audit log dengan timestamp, IP, dan alasan yang Anda isi. Atasan dapat melihat aktivitas ini.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <x-nawasara-ui::form.label>
+                    Alasan akses <span class="text-red-500">*</span>
+                </x-nawasara-ui::form.label>
+                <textarea wire:model="launchAsReason" rows="3"
+                    class="block w-full rounded-lg border-gray-200 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-200 text-sm focus:border-emerald-600 focus:ring-emerald-600"
+                    placeholder="Contoh: User minta bantuan setting subdomain karena tidak paham DNS records"></textarea>
+                @error('launchAsReason')
+                    <p class="text-xs text-red-600 dark:text-red-400 mt-1">{{ $message }}</p>
+                @enderror
+                <p class="text-xs text-gray-500 dark:text-neutral-400 mt-1">Minimal 10 karakter. Semakin spesifik semakin baik untuk audit.</p>
+            </div>
+        </form>
+
+        <x-slot:footer>
+            <x-nawasara-ui::button color="neutral" variant="outline" @click="$dispatch('close-modal', 'whm-account-launch-as')">Batal</x-nawasara-ui::button>
+            <x-nawasara-ui::button type="submit" form="whm-account-launch-as-form" color="warning">
+                <x-slot:icon><x-lucide-external-link /></x-slot:icon>
+                Buka cPanel
+            </x-nawasara-ui::button>
+        </x-slot:footer>
+    </x-nawasara-ui::modal>
+
+    {{-- JS bridge: buka URL session di tab baru. Listener attached di
+         livewire:init supaya tetap aktif walaupun component re-render.
+         noopener,noreferrer = best practice security untuk eksternal redirect. --}}
+    <script>
+        document.addEventListener('livewire:init', () => {
+            Livewire.on('cpanel-launch-window', (event) => {
+                const payload = Array.isArray(event) ? event[0] : event;
+                const url = payload?.url;
+                if (!url) return;
+                window.open(url, '_blank', 'noopener,noreferrer');
+            });
+        });
+    </script>
 
     {{-- Suspend Modal --}}
     <x-nawasara-ui::modal id="whm-suspend" maxWidth="md" :title="'Suspend: '.$suspendUsername">

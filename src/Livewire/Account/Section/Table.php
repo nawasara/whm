@@ -3,6 +3,7 @@
 namespace Nawasara\Whm\Livewire\Account\Section;
 
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
@@ -11,9 +12,12 @@ use Livewire\WithPagination;
 use Nawasara\Registry\Models\Asset;
 use Nawasara\Ui\Livewire\Concerns\HasBrowserToast;
 use Nawasara\Ui\Livewire\Concerns\HasExport;
+use Nawasara\Whm\Exceptions\WebmailSessionException;
 use Nawasara\Whm\Livewire\Concerns\HasServerRole;
+use Nawasara\Whm\Models\CpanelSession;
 use Nawasara\Whm\Models\WhmAccount;
 use Nawasara\Whm\Repositories\WhmAccountRepository;
+use Nawasara\Whm\Services\WebmailSessionService;
 use Nawasara\Whm\Services\WhmClient;
 
 class Table extends Component
@@ -72,6 +76,13 @@ class Table extends Component
 
     // Bulk suspend modal
     public string $bulkSuspendReason = '';
+
+    // Launch-as (admin impersonation) modal state. Mirror flow di
+    // Email\Section\Table — admin klik "Buka cPanel", isi alasan, lalu
+    // tab baru terbuka langsung di cPanel sebagai user pemilik akun.
+    public string $launchAsUsername = '';
+    public string $launchAsDomain = '';
+    public string $launchAsReason = '';
 
     protected WhmClient $whm;
 
@@ -341,6 +352,170 @@ class Table extends Component
             $this->toastSuccess("Terminate dispatched untuk {$username}");
         } catch (\Throwable $e) {
             $this->toastError($e->getMessage());
+        }
+    }
+
+    // ─── Launch as (admin impersonation) ────────────────
+
+    /**
+     * Buka modal konfirmasi sebelum admin masuk ke cPanel akun user.
+     * Reason wajib diisi supaya audit trail actionable — atasan harus tahu
+     * kenapa akun cPanel X diakses oleh admin Y.
+     *
+     * Permission check di sini PLUS di submit handler — defense in depth,
+     * jangan cuma di submit (kalau user manipulasi DOM, modal masih bisa
+     * kebuka tapi submit akan ditolak).
+     */
+    public function openLaunchAs(string $username, ?string $domain = null): void
+    {
+        Gate::authorize('cpanel.session.launch_as');
+
+        $this->launchAsUsername = $username;
+        $this->launchAsDomain = $domain ?? '';
+        $this->launchAsReason = '';
+        $this->resetErrorBag('launchAsReason');
+
+        $this->dispatch('modal-open:whm-account-launch-as');
+    }
+
+    /**
+     * Forge cPanel session URL via WHM `create_user_session?service=cpaneld`,
+     * audit-log attempt, lalu emit JS event yang membuka URL di tab baru.
+     *
+     * Pakai `WebmailSessionService::createSession(..., 'cpaneld')` daripada
+     * method dedicated `createCpanelUrl` — alasannya `createCpanelUrl` masih
+     * pakai `assertMailboxUsable` validation yang spesifik ke webmail flow.
+     * Sebagai gantinya kita validasi sendiri akun cPanel di sini (cek
+     * snapshot WhmAccount + suspended status).
+     *
+     * Catatan: cPanel login URL bersifat one-shot dengan TTL pendek (~5 menit
+     * default WHM). Kalau admin lambat klik tab baru, URL bisa expired.
+     */
+    public function confirmLaunchAs(WebmailSessionService $service)
+    {
+        Gate::authorize('cpanel.session.launch_as');
+
+        $this->validate([
+            'launchAsUsername' => 'required|string|max:64',
+            'launchAsReason' => 'required|string|min:10|max:500',
+        ], [], [
+            'launchAsReason' => 'alasan akses',
+        ]);
+
+        $username = $this->launchAsUsername;
+        $reason = trim($this->launchAsReason);
+        $instance = $this->server ?: null;
+
+        // Validate akun di snapshot DB. Kalau akun tidak exist di DB tapi
+        // exist di WHM, sync mungkin stale — admin bisa refresh sync dulu.
+        // Kalau akun suspended, WHM pasti reject session juga, jadi
+        // pre-flight check di sini supaya error message lebih jelas.
+        $account = WhmAccount::query()
+            ->forInstance($instance)
+            ->where('username', $username)
+            ->first();
+
+        if (! $account) {
+            $this->logImpersonationAttempt(
+                username: $username,
+                domain: null,
+                instance: $instance,
+                reason: $reason,
+                status: CpanelSession::STATUS_FAILED,
+                error: 'Akun tidak ditemukan di snapshot. Sync ulang accounts atau verifikasi username.',
+            );
+            $this->dispatch('modal-close:whm-account-launch-as');
+            $this->toastError("Akun cPanel `{$username}` tidak ditemukan di snapshot. Coba sync ulang.");
+            return null;
+        }
+
+        if ($account->suspended) {
+            $this->logImpersonationAttempt(
+                username: $username,
+                domain: $account->domain,
+                instance: $instance,
+                reason: $reason,
+                status: CpanelSession::STATUS_FAILED,
+                error: 'Akun suspended: '.($account->suspend_reason ?? 'tanpa alasan'),
+            );
+            $this->dispatch('modal-close:whm-account-launch-as');
+            $this->toastError("Akun cPanel `{$username}` sedang suspended. Unsuspend dulu sebelum launch.");
+            return null;
+        }
+
+        try {
+            $result = $service->createSession($username, 'cpaneld', $instance);
+        } catch (WebmailSessionException $e) {
+            // WebmailSessionException nama generic untuk semua error WHM
+            // session forging (di-share antara webmail + cpanel flow).
+            $this->logImpersonationAttempt(
+                username: $username,
+                domain: $account->domain,
+                instance: $instance,
+                reason: $reason,
+                status: CpanelSession::STATUS_FAILED,
+                error: $e->getMessage(),
+            );
+
+            Log::warning('[cpanel] admin launch-as failed', [
+                'admin_id' => auth()->id(),
+                'target_user' => $username,
+                'instance' => $instance,
+                'message' => $e->getMessage(),
+            ]);
+
+            $this->dispatch('modal-close:whm-account-launch-as');
+            $this->toastError('Gagal forge session cPanel: '.$e->getMessage());
+            return null;
+        }
+
+        $this->logImpersonationAttempt(
+            username: $username,
+            domain: $account->domain,
+            instance: $instance,
+            reason: $reason,
+            status: CpanelSession::STATUS_ISSUED,
+            error: null,
+        );
+
+        // Open di tab baru via JS event — admin tidak kehilangan context
+        // Nawasara. Same pattern dengan webmail launch-as.
+        $this->dispatch('modal-close:whm-account-launch-as');
+        $this->dispatch('cpanel-launch-window', url: $result['url'], expiresIn: $result['expires_in']);
+
+        return null;
+    }
+
+    /**
+     * Insert audit row untuk cPanel impersonation attempt. Defensive — kalau
+     * audit insert gagal (DB issue), JANGAN throw, log saja. Admin tetap perlu
+     * dapet redirect / error feedback untuk action utamanya.
+     */
+    protected function logImpersonationAttempt(
+        string $username,
+        ?string $domain,
+        ?string $instance,
+        string $reason,
+        string $status,
+        ?string $error,
+    ): void {
+        try {
+            CpanelSession::create([
+                'acted_by_user_id' => auth()->id(),
+                'cpanel_user' => $username,
+                'domain' => $domain,
+                'instance' => $instance,
+                'reason' => $reason,
+                'ip' => request()->ip(),
+                'user_agent' => substr((string) request()->userAgent(), 0, 500),
+                'status' => $status,
+                'error' => $error,
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('[cpanel] impersonation audit log failed: '.$e->getMessage(), [
+                'admin_id' => auth()->id(),
+                'target_user' => $username,
+            ]);
         }
     }
 
