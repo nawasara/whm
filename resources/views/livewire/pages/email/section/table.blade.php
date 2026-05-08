@@ -312,22 +312,26 @@
 
         <x-slot:footer>
             <x-nawasara-ui::button color="neutral" variant="outline" @click="$dispatch('close-modal', 'whm-email-launch-as')">Batal</x-nawasara-ui::button>
-            {{-- Submit button: SYNC click handler pre-open about:blank di tab
-                 baru sebelum form submit. Reference disimpan ke window scope
-                 supaya JS listener bisa update URL setelah Livewire response. --}}
+            {{-- onclick INTENTIONALLY tidak pakai noopener,noreferrer karena
+                 itu bikin window.open() return null — kita tidak bisa
+                 update tab.location.href di event listener nanti. Pakai
+                 explicit `tab.opener = null` setelah URL update sebagai
+                 substitute (lihat <script> di bawah). --}}
             <x-nawasara-ui::button
                 type="submit"
                 form="whm-email-launch-as-form"
                 color="warning"
-                onclick="window.__nawasaraWebmailLaunchTab = window.open('about:blank', '_blank', 'noopener,noreferrer')">
+                onclick="window.__nawasaraWebmailLaunchTab = window.open('about:blank', '_blank')">
                 <x-slot:icon><x-lucide-external-link /></x-slot:icon>
                 Buka Webmail
             </x-nawasara-ui::button>
         </x-slot:footer>
     </x-nawasara-ui::modal>
 
-    {{-- JS bridge: update URL tab pre-opened dengan session URL. Fallback
-         window.open kalau tab reference hilang/closed. --}}
+    {{-- JS bridge: update URL tab pre-opened dengan session URL. Setelah
+         URL update, null out opener untuk security (substitute for noopener
+         yang tidak bisa kita pakai di pre-open). Fallback window.open
+         kalau tab reference hilang/closed. --}}
     <script>
         document.addEventListener('livewire:init', () => {
             Livewire.on('webmail-launch-window', (event) => {
@@ -338,6 +342,7 @@
                 const tab = window.__nawasaraWebmailLaunchTab;
                 if (tab && ! tab.closed) {
                     tab.location.href = url;
+                    try { tab.opener = null; } catch (e) { /* cross-origin */ }
                 } else {
                     window.open(url, '_blank', 'noopener,noreferrer');
                 }

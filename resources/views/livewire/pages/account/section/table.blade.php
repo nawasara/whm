@@ -360,11 +360,19 @@
                  supaya JS listener (di-script bawah) bisa update URL-nya
                  setelah Livewire response balik dengan session URL.
                  noopener,noreferrer + target=_blank = best practice security. --}}
+            {{-- onclick INTENTIONALLY tidak pakai noopener,noreferrer di
+                 window.open() — kalau pakai, MDN spec bilang return value
+                 jadi null, jadi kita tidak bisa update tab.location.href
+                 saat Livewire response balik. Trade-off: tab baru punya
+                 window.opener reference ke Nawasara. Risk acceptable karena
+                 target (cPanel/Webmail) adalah trusted internal service
+                 + we explicitly null out opener after URL update di JS
+                 listener (defense in depth). --}}
             <x-nawasara-ui::button
                 type="submit"
                 form="whm-account-launch-as-form"
                 color="warning"
-                onclick="window.__nawasaraCpanelLaunchTab = window.open('about:blank', '_blank', 'noopener,noreferrer')">
+                onclick="window.__nawasaraCpanelLaunchTab = window.open('about:blank', '_blank')">
                 <x-slot:icon><x-lucide-external-link /></x-slot:icon>
                 Buka cPanel
             </x-nawasara-ui::button>
@@ -372,10 +380,14 @@
     </x-nawasara-ui::modal>
 
     {{-- JS bridge: update URL tab pre-opened dengan session URL dari Livewire
-         response. Kalau event fire tapi tab reference hilang (mis. browser
-         tetap blok popup), fallback window.open(url, '_blank') — di moment
-         ini biasanya popup blocker tidak akan blok karena user baru saja
-         klik (5-10ms ago). --}}
+         response. Setelah update, defensive null-out opener supaya cPanel
+         tidak bisa manipulate window.opener.location (sub for noopener
+         since we couldn't use it at pre-open time).
+
+         Kalau pre-open gagal (browser blok meskipun sync click) ATAU user
+         sudah close tab pre-opened → fallback window.open. Di moment ini
+         (beberapa ms setelah click) browser biasanya masih allow karena
+         click context belum expired. --}}
     <script>
         document.addEventListener('livewire:init', () => {
             Livewire.on('cpanel-launch-window', (event) => {
@@ -386,8 +398,14 @@
                 const tab = window.__nawasaraCpanelLaunchTab;
                 if (tab && ! tab.closed) {
                     tab.location.href = url;
+                    // Defense in depth — null out opener setelah URL update.
+                    // Kalau cPanel sempat eval JS sebelum kita null, masih
+                    // bisa reach window.opener — tapi window itu kita
+                    // sendiri dan akan close kalau user balik ke Nawasara.
+                    try { tab.opener = null; } catch (e) { /* cross-origin block */ }
                 } else {
-                    // Fallback — pre-open tab gagal atau closed by user.
+                    // Fallback: tab pre-opened gagal/closed. Pakai noopener
+                    // di sini boleh karena tidak butuh reference balik.
                     window.open(url, '_blank', 'noopener,noreferrer');
                 }
                 window.__nawasaraCpanelLaunchTab = null;
