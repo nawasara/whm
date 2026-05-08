@@ -358,7 +358,25 @@ class Table extends Component
 
         $this->validate([
             'launchAsEmail' => 'required|email',
-            'launchAsReason' => 'required|string|min:10|max:500',
+            'launchAsReason' => [
+                'required', 'string', 'min:10', 'max:500',
+                // Reject reasons yang copy-paste dari banner peringatan modal.
+                // Lihat penjelasan di Account\\Section\\Table::confirmLaunchAs.
+                function ($attribute, $value, $fail) {
+                    $banned = [
+                        'akses ini dicatat',
+                        'audit log',
+                        'atasan dapat melihat',
+                    ];
+                    $lower = mb_strtolower(trim((string) $value));
+                    foreach ($banned as $needle) {
+                        if (str_contains($lower, $needle)) {
+                            $fail('Alasan tidak boleh menyalin teks dari banner peringatan. Tulis alasan akses yang spesifik.');
+                            return;
+                        }
+                    }
+                },
+            ],
         ], [], [
             'launchAsReason' => 'alasan akses',
         ]);
