@@ -46,24 +46,41 @@ class WebmailSessionService
     /**
      * General session creator — bisa untuk service lain (cpaneld, whostmgrd).
      * Webmail launcher cukup pakai createWebmailUrl().
+     *
+     * Parameter $user shape tergantung $service:
+     *   - webmaild  : full email address `local@domain` (validated as mailbox)
+     *   - cpaneld   : cPanel account username, tanpa @ (validated as account)
+     *   - whostmgrd : WHM admin username, biasanya `root` (no validation)
+     *
+     * Validasi pre-flight terbatas ke webmail + cpanel — yang punya snapshot
+     * di Nawasara DB. Service lain langsung pass-through ke WHM API; kalau
+     * input invalid, WHM error response yang akan muncul (di-classify nanti
+     * di controller/livewire).
      */
-    public function createSession(string $emailAccount, string $service = 'webmaild', ?string $instance = null): array
+    public function createSession(string $user, string $service = 'webmaild', ?string $instance = null): array
     {
-        $client = $this->resolveClient($instance);
+        $client = $this->resolveClient($instance, $service);
 
         if (! $client->isConfigured()) {
             throw new WebmailSessionException('WHM credential belum lengkap untuk instance "'.($instance ?? 'default').'".');
         }
 
-        $this->ensureMailboxAccessible($client, $emailAccount);
+        // Validasi pre-flight by service kind. webmaild butuh email validation
+        // + mailbox-exists check. cpaneld butuh account-exists check (no @).
+        // Service lain skip — assume caller sudah validate.
+        if ($service === 'webmaild') {
+            $this->ensureMailboxAccessible($client, $user);
+        } elseif ($service === 'cpaneld') {
+            $this->ensureCpanelAccountAccessible($client, $user);
+        }
 
-        // WHM endpoint: GET /json-api/create_user_session?api.version=1&user={email}&service=webmaild&locale=en
-        // Catatan: untuk login webmail, parameter `user` HARUS email lengkap (user@domain),
-        // bukan username cPanel. Service `webmaild` tahu dispatch ke mailbox berdasarkan email.
+        // WHM endpoint: GET /json-api/create_user_session?api.version=1&user={user}&service=...&locale=en
+        // Untuk webmail: user = full email address.
+        // Untuk cpanel:  user = cPanel account username.
         try {
             $response = $client->rawJsonApi('create_user_session', [
                 'api.version' => 1,
-                'user' => $emailAccount,
+                'user' => $user,
                 'service' => $service,
                 'locale' => 'en',
             ]);
@@ -128,17 +145,33 @@ class WebmailSessionService
     }
 
     /**
-     * Pilih instance WHM. Kalau caller tidak specify, ambil instance pertama
-     * yang punya role `mail` (atau `both`). Itu match konvensi WHM-Ryder
-     * yang dedicated mail server.
+     * Pilih instance WHM berdasarkan service kind:
+     *   - webmaild → role `mail`     (mail server, mis. WHM-Ryder)
+     *   - cpaneld  → role `hosting`  (hosting server, mis. WHM-30)
+     *   - lainnya  → role `mail` (default fallback yang punya backwards compat
+     *                              ke pemanggil lama yang skip $service param)
+     *
+     * Kalau caller specify $instance eksplisit, pakai itu langsung tanpa
+     * lookup role. Itu kasus admin yang tahu mau target instance mana.
+     *
+     * Kalau role tidak ada instance match (mis. user belum config WHM
+     * hosting), fall through ke default client tanpa instance — itu akan
+     * trigger isConfigured() check di caller dengan pesan error yang clear
+     * ("WHM credential belum lengkap").
      */
-    protected function resolveClient(?string $instance): WhmClient
+    protected function resolveClient(?string $instance, string $service = 'webmaild'): WhmClient
     {
         if ($instance) {
             return $this->client->forInstance($instance);
         }
 
-        $default = $this->client->defaultInstanceForRole('mail');
+        $role = match ($service) {
+            'cpaneld' => 'hosting',
+            'webmaild' => 'mail',
+            default => 'mail',
+        };
+
+        $default = $this->client->defaultInstanceForRole($role);
         return $default ? $this->client->forInstance($default) : $this->client;
     }
 
@@ -187,6 +220,37 @@ class WebmailSessionService
         if ($parent && (int) ($parent['suspended'] ?? 0) === 1) {
             $reason = (string) ($parent['suspendreason'] ?? 'unknown');
             throw new MailboxSuspendedException("Parent cPanel account untuk domain `{$domain}` sedang suspended ({$reason}).");
+        }
+    }
+
+    /**
+     * Validasi: cPanel account terdaftar di WHM (via listaccts cache) dan
+     * tidak suspended. Mirip ensureMailboxAccessible tapi key-nya `username`
+     * bukan `email`/domain. Throw MailboxNotFoundException/MailboxSuspendedException
+     * supaya controller bisa render pesan yang konsisten.
+     *
+     * Catatan: nama exception masih `Mailbox*` walaupun konteksnya cPanel
+     * account — exception class itu sudah di-share dengan webmail flow.
+     * Renaming jadi `Account*` butuh refactor downstream (controller match
+     * by class), low-priority untuk sekarang.
+     */
+    protected function ensureCpanelAccountAccessible(WhmClient $client, string $cpanelUser): void
+    {
+        $cpanelUser = trim($cpanelUser);
+        if ($cpanelUser === '') {
+            throw new WebmailSessionException('cPanel username kosong.');
+        }
+
+        $accs = $client->getCachedAccounts();
+        $match = collect($accs)->first(fn ($a) => strcasecmp($a['user'] ?? '', $cpanelUser) === 0);
+
+        if (! $match) {
+            throw new MailboxNotFoundException("Akun cPanel `{$cpanelUser}` tidak terdaftar di WHM.");
+        }
+
+        if ((int) ($match['suspended'] ?? 0) === 1) {
+            $reason = (string) ($match['suspendreason'] ?? 'unknown');
+            throw new MailboxSuspendedException("Akun cPanel `{$cpanelUser}` sedang suspended ({$reason}).");
         }
     }
 
