@@ -403,16 +403,16 @@ class Table extends Component
             error: null,
         );
 
-        // Redirect tab admin ke webmail session URL. Tidak pakai
-        // window.open(url, '_blank') karena dipanggil dari async Livewire
-        // response — browser pop-up blocker treats programmatic window.open
-        // outside direct user-click context as suspicious dan silently block
-        // (real symptom yang user laporkan untuk cPanel flow).
-        //
-        // Trade-off: admin kehilangan tab Nawasara sementara, tapi browser
-        // back button cukup untuk balik. Reliability menang vs UX gloss.
+        // Buka di tab baru — admin tidak kehilangan context Nawasara.
+        // Pattern popup-blocker safe: tab baru di-pre-open di JS saat user
+        // click submit button (sync click context, allowed by browser),
+        // kita cuma dispatch event ke JS untuk update URL tab tsb dari
+        // about:blank ke session URL.
         $this->dispatch('modal-close:whm-email-launch-as');
-        return redirect()->away($result['url']);
+        $this->dispatch('webmail-launch-window', url: $result['url']);
+        $this->toastSuccess("Session webmail `{$email}` di-buka di tab baru.");
+
+        return null;
     }
 
     /**

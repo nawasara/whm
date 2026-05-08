@@ -478,17 +478,17 @@ class Table extends Component
             error: null,
         );
 
-        // Redirect tab admin ke cPanel session URL. Sengaja TIDAK pakai
-        // window.open(url, '_blank') karena dipanggil dari async Livewire
-        // response — browser pop-up blocker treats programmatic window.open
-        // outside direct user-click context as suspicious dan silently block.
-        // (Webmail flow had the same issue, lihat sister commit di Email
-        // table component.)
-        //
-        // Trade-off: admin kehilangan tab Nawasara sementara, tapi browser
-        // back button cukup untuk balik. Reliability menang vs UX gloss.
+        // Buka di tab baru — admin tidak kehilangan context Nawasara.
+        // Pattern popup-blocker safe: tab baru sudah di-pre-open di JS
+        // saat user click button (lihat <script> di view), kita cuma
+        // dispatch event ke JS untuk update URL tab tsb dari about:blank
+        // ke session URL. Karena tab di-buka di sync click context, browser
+        // tidak treat ini sebagai programmatic popup.
         $this->dispatch('modal-close:whm-account-launch-as');
-        return redirect()->away($result['url']);
+        $this->dispatch('cpanel-launch-window', url: $result['url']);
+        $this->toastSuccess("Session cPanel `{$username}` di-buka di tab baru.");
+
+        return null;
     }
 
     /**

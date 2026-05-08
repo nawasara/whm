@@ -273,10 +273,17 @@
 
     {{-- Launch-as (Admin Impersonation) Modal — buka Roundcube sebagai pemilik
          mailbox tanpa tahu password mereka. Wajib isi alasan supaya audit
-         trail actionable. Setelah submit, Livewire response redirect tab
-         admin ke session URL Roundcube (admin balik ke Nawasara via browser
-         back button). Tidak pakai window.open karena pop-up blocker browser
-         silently block programmatic open di async response. --}}
+         trail actionable.
+
+         Tab pattern (popup-blocker safe):
+           1. User klik [Buka Webmail] di footer → JS pre-open about:blank di
+              tab baru (SYNC dari user click context — browser allow).
+           2. Reference tab disimpan di window scope, lalu form submit normal
+              ke Livewire.
+           3. Livewire response dispatch event `webmail-launch-window` dengan
+              URL session → JS listener update tab.location.href.
+           4. Kalau Livewire error / event tidak fire → tab pre-opened tetap
+              about:blank, user lihat blank page. --}}
     <x-nawasara-ui::modal id="whm-email-launch-as" maxWidth="lg" :title="'Buka Webmail: '.$launchAsEmail">
         <form wire:submit="confirmLaunchAs" id="whm-email-launch-as-form" class="space-y-4">
             <div class="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800/50 p-3 text-sm text-amber-800 dark:text-amber-200">
@@ -305,12 +312,39 @@
 
         <x-slot:footer>
             <x-nawasara-ui::button color="neutral" variant="outline" @click="$dispatch('close-modal', 'whm-email-launch-as')">Batal</x-nawasara-ui::button>
-            <x-nawasara-ui::button type="submit" form="whm-email-launch-as-form" color="warning">
+            {{-- Submit button: SYNC click handler pre-open about:blank di tab
+                 baru sebelum form submit. Reference disimpan ke window scope
+                 supaya JS listener bisa update URL setelah Livewire response. --}}
+            <x-nawasara-ui::button
+                type="submit"
+                form="whm-email-launch-as-form"
+                color="warning"
+                onclick="window.__nawasaraWebmailLaunchTab = window.open('about:blank', '_blank', 'noopener,noreferrer')">
                 <x-slot:icon><x-lucide-external-link /></x-slot:icon>
                 Buka Webmail
             </x-nawasara-ui::button>
         </x-slot:footer>
     </x-nawasara-ui::modal>
+
+    {{-- JS bridge: update URL tab pre-opened dengan session URL. Fallback
+         window.open kalau tab reference hilang/closed. --}}
+    <script>
+        document.addEventListener('livewire:init', () => {
+            Livewire.on('webmail-launch-window', (event) => {
+                const payload = Array.isArray(event) ? event[0] : event;
+                const url = payload?.url;
+                if (! url) return;
+
+                const tab = window.__nawasaraWebmailLaunchTab;
+                if (tab && ! tab.closed) {
+                    tab.location.href = url;
+                } else {
+                    window.open(url, '_blank', 'noopener,noreferrer');
+                }
+                window.__nawasaraWebmailLaunchTab = null;
+            });
+        });
+    </script>
 
     {{-- Detail Modal --}}
     <x-nawasara-ui::modal id="whm-email-detail" maxWidth="lg" :title="'Detail: '.($this->detail->email ?? '')">
