@@ -96,7 +96,7 @@ class WebmailSessionService
             throw new WebmailSessionException('WHM tidak mengembalikan URL session: '.$reason);
         }
 
-        $url = $this->rewritePublicHost($url, $client->instance());
+        $url = $this->rewritePublicHost($url, $client->instance(), $service);
 
         return [
             'url' => $url,
@@ -107,19 +107,39 @@ class WebmailSessionService
     }
 
     /**
-     * Rewrite host bagian dari session URL ke `webmail_host` Vault kalau
-     * di-set untuk instance ini. Path + query string + cpsess token tetap
-     * intact — cuma scheme + host + port yang ditukar.
+     * Rewrite host bagian dari session URL ke public hostname per service.
+     * Path + query string + cpsess token tetap intact — cuma scheme + host
+     * + port yang ditukar.
      *
-     * Use case: WHM API balas URL pakai hostname server (ryder.ponorogo.go.id),
-     * tapi user akses lewat hostname public/CNAME (gentapraja.ponorogo.go.id).
-     * Kalau cookie domain WHM scoped ke ryder, login tetap valid karena
-     * Set-Cookie pertama dari ryder ke browser; tapi URL yang user lihat
-     * akhirnya pakai host public.
+     * Vault key per service:
+     *   - webmaild  → `webmail_host`  (mis. https://gentapraja.ponorogo.go.id:2096)
+     *   - cpaneld   → `cpanel_host`   (mis. https://cpserv.ponorogo.go.id:2083)
+     *   - whostmgrd → `whm_host`      (mis. https://cpserv.ponorogo.go.id:2087)
+     *
+     * Use case: WHM API balikin URL session pakai IP server atau hostname
+     * internal (mis. `103.109.206.30:2083`). Kalau user akses URL itu
+     * langsung, browser nge-blok karena SSL cert mismatch (cert issued
+     * untuk hostname, bukan IP) atau hostname tidak resolvable dari LAN
+     * client.
+     *
+     * Kalau cookie domain WHM scoped ke origin asli (IP), login tetap valid
+     * karena Set-Cookie pertama-tama yang dikirim browser dari origin baru
+     * akan match (cPanel issue cookie domain wide enough). URL yang user
+     * lihat di address bar akhirnya pakai hostname public.
+     *
+     * Kalau Vault key untuk service ini kosong, return URL apa adanya —
+     * konfigurasi opt-in per service per instance.
      */
-    protected function rewritePublicHost(string $url, ?string $instance): string
+    protected function rewritePublicHost(string $url, ?string $instance, string $service = 'webmaild'): string
     {
-        $publicHost = (string) \Nawasara\Vault\Facades\Vault::get('whm', 'webmail_host', $instance);
+        $vaultKey = match ($service) {
+            'cpaneld' => 'cpanel_host',
+            'whostmgrd' => 'whm_host',
+            'webmaild' => 'webmail_host',
+            default => 'webmail_host',
+        };
+
+        $publicHost = (string) \Nawasara\Vault\Facades\Vault::get('whm', $vaultKey, $instance);
         if ($publicHost === '') {
             return $url;
         }
