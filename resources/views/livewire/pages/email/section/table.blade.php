@@ -273,9 +273,10 @@
 
     {{-- Launch-as (Admin Impersonation) Modal — buka Roundcube sebagai pemilik
          mailbox tanpa tahu password mereka. Wajib isi alasan supaya audit
-         trail actionable. URL session di-buka di tab BARU lewat JS event
-         `webmail-launch-window` (lihat <script> di bawah) supaya admin tidak
-         kehilangan context Nawasara. --}}
+         trail actionable. Setelah submit, Livewire response redirect tab
+         admin ke session URL Roundcube (admin balik ke Nawasara via browser
+         back button). Tidak pakai window.open karena pop-up blocker browser
+         silently block programmatic open di async response. --}}
     <x-nawasara-ui::modal id="whm-email-launch-as" maxWidth="lg" :title="'Buka Webmail: '.$launchAsEmail">
         <form wire:submit="confirmLaunchAs" id="whm-email-launch-as-form" class="space-y-4">
             <div class="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800/50 p-3 text-sm text-amber-800 dark:text-amber-200">
@@ -310,25 +311,6 @@
             </x-nawasara-ui::button>
         </x-slot:footer>
     </x-nawasara-ui::modal>
-
-    {{-- JS bridge: buka URL session di tab baru, tidak navigate current tab.
-         Pakai `webmail-launch-window` event dari Livewire — Alpine listener
-         di-attach ke window supaya tidak tergantung component DOM. --}}
-    <script>
-        document.addEventListener('livewire:init', () => {
-            Livewire.on('webmail-launch-window', (event) => {
-                // Livewire 3 dispatch shape: event[0] = first arg as object
-                // (named args jadi keys). Kalau struktur berubah, defensif:
-                const payload = Array.isArray(event) ? event[0] : event;
-                const url = payload?.url;
-                if (!url) return;
-
-                // noopener supaya tab baru tidak punya reference ke window.opener —
-                // best practice security untuk eksternal redirect.
-                window.open(url, '_blank', 'noopener,noreferrer');
-            });
-        });
-    </script>
 
     {{-- Detail Modal --}}
     <x-nawasara-ui::modal id="whm-email-detail" maxWidth="lg" :title="'Detail: '.($this->detail->email ?? '')">

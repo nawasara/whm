@@ -403,14 +403,16 @@ class Table extends Component
             error: null,
         );
 
-        // Redirect tab BARU akan di-handle browser-side via JS (target=_blank).
-        // Livewire `redirect()->away()` akan navigate current tab. Untuk admin
-        // yang lagi mid-task tidak ideal, jadi kita dispatch event ke JS yang
-        // window.open() di tab baru. Modal close sekaligus.
+        // Redirect tab admin ke webmail session URL. Tidak pakai
+        // window.open(url, '_blank') karena dipanggil dari async Livewire
+        // response — browser pop-up blocker treats programmatic window.open
+        // outside direct user-click context as suspicious dan silently block
+        // (real symptom yang user laporkan untuk cPanel flow).
+        //
+        // Trade-off: admin kehilangan tab Nawasara sementara, tapi browser
+        // back button cukup untuk balik. Reliability menang vs UX gloss.
         $this->dispatch('modal-close:whm-email-launch-as');
-        $this->dispatch('webmail-launch-window', url: $result['url'], expiresIn: $result['expires_in']);
-
-        return null;
+        return redirect()->away($result['url']);
     }
 
     /**

@@ -478,12 +478,17 @@ class Table extends Component
             error: null,
         );
 
-        // Open di tab baru via JS event — admin tidak kehilangan context
-        // Nawasara. Same pattern dengan webmail launch-as.
+        // Redirect tab admin ke cPanel session URL. Sengaja TIDAK pakai
+        // window.open(url, '_blank') karena dipanggil dari async Livewire
+        // response — browser pop-up blocker treats programmatic window.open
+        // outside direct user-click context as suspicious dan silently block.
+        // (Webmail flow had the same issue, lihat sister commit di Email
+        // table component.)
+        //
+        // Trade-off: admin kehilangan tab Nawasara sementara, tapi browser
+        // back button cukup untuk balik. Reliability menang vs UX gloss.
         $this->dispatch('modal-close:whm-account-launch-as');
-        $this->dispatch('cpanel-launch-window', url: $result['url'], expiresIn: $result['expires_in']);
-
-        return null;
+        return redirect()->away($result['url']);
     }
 
     /**

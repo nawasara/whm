@@ -313,9 +313,10 @@
 
     {{-- Launch-as (Admin Impersonation) Modal — buka cPanel sebagai pemilik
          akun tanpa tahu password mereka. Wajib isi alasan supaya audit trail
-         actionable. URL session di-buka di tab BARU lewat JS event
-         `cpanel-launch-window` (lihat <script> di bawah) supaya admin tidak
-         kehilangan context Nawasara. --}}
+         actionable. Setelah submit, Livewire response redirect tab admin ke
+         session URL cPanel (admin balik ke Nawasara via browser back button).
+         Tidak pakai window.open karena pop-up blocker browser silently block
+         programmatic open di async response. --}}
     <x-nawasara-ui::modal id="whm-account-launch-as" maxWidth="lg" :title="'Buka cPanel: '.$launchAsUsername">
         <form wire:submit="confirmLaunchAs" id="whm-account-launch-as-form" class="space-y-4">
             <div class="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800/50 p-3 text-sm text-amber-800 dark:text-amber-200">
@@ -352,20 +353,6 @@
             </x-nawasara-ui::button>
         </x-slot:footer>
     </x-nawasara-ui::modal>
-
-    {{-- JS bridge: buka URL session di tab baru. Listener attached di
-         livewire:init supaya tetap aktif walaupun component re-render.
-         noopener,noreferrer = best practice security untuk eksternal redirect. --}}
-    <script>
-        document.addEventListener('livewire:init', () => {
-            Livewire.on('cpanel-launch-window', (event) => {
-                const payload = Array.isArray(event) ? event[0] : event;
-                const url = payload?.url;
-                if (!url) return;
-                window.open(url, '_blank', 'noopener,noreferrer');
-            });
-        });
-    </script>
 
     {{-- Suspend Modal --}}
     <x-nawasara-ui::modal id="whm-suspend" maxWidth="md" :title="'Suspend: '.$suspendUsername">
