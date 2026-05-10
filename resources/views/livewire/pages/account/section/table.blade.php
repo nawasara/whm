@@ -159,9 +159,9 @@
                             <x-nawasara-ui::dropdown-menu-action :id="$acct->id" :items="[
                                 ['type' => 'click', 'label' => 'Detail', 'wire:click' => 'openDetail('.$acct->id.')', 'modal' => 'whm-account-detail', 'icon' => 'lucide-eye', 'permission' => 'whm.account.view'],
                                 // Admin impersonation — launch cPanel sebagai pemilik akun.
-                                // Permission terpisah (cpanel.session.launch_as) supaya bisa di-grant
+                                // Permission terpisah (whm.cpanel.launch_as) supaya bisa di-grant
                                 // ke admin tertentu tanpa kasih full whm.account.manage.
-                                ['type' => 'click', 'label' => 'Buka cPanel', 'wire:click' => 'openLaunchAs(\'' . $acct->username . '\', \'' . addslashes($acct->domain ?? '') . '\')', 'modal' => 'whm-account-launch-as', 'icon' => 'lucide-external-link', 'permission' => 'cpanel.session.launch_as'],
+                                ['type' => 'click', 'label' => 'Buka cPanel', 'wire:click' => 'openLaunchAs(\'' . $acct->username . '\', \'' . addslashes($acct->domain ?? '') . '\')', 'modal' => 'whm-account-launch-as', 'icon' => 'lucide-external-link', 'permission' => 'whm.cpanel.launch_as'],
                                 ['type' => 'click', 'label' => 'Change Password', 'wire:click' => 'openChangePassword(\'' . $acct->username . '\')', 'modal' => 'whm-password', 'icon' => 'lucide-key-round', 'permission' => 'whm.account.manage'],
                                 $acct->suspended
                                     ? ['type' => 'click', 'label' => 'Unsuspend', 'wire:click' => 'unsuspend(\'' . $acct->username . '\')', 'icon' => 'lucide-play', 'permission' => 'whm.account.suspend']

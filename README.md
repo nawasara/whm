@@ -231,8 +231,16 @@ php artisan db:seed --class="Nawasara\Whm\Database\Seeders\PermissionSeeder" --f
 | **System** ||
 | `whm.ssh.execute` | Gating untuk operasi via SSH |
 | `whm.sync.execute` | Run manual sync |
+| **Session (cross-package — webmail SSO bridge)** ||
+| `whm.session.create` | Internal: panggil API `create_user_session` |
+| `webmail.session.launch` | User-facing webmail auto-login (default-attached ke role `guest` + `developer`) |
+| `webmail.session.audit.view` | Audit-only — lihat history launch tanpa kemampuan launch (compliance reviewer) |
+| `webmail.session.launch_as` | Admin impersonation: buka webmail user manapun. **Sensitive** — manual assign per admin |
+| `whm.cpanel.launch_as` | Admin impersonation: buka cPanel akun manapun (full hosting control). **Sensitive** — separate dari webmail.* |
 
 Semua permission otomatis ter-assign ke role `developer`.
+
+> **Catatan permission webmail.\* dan whm.cpanel.launch_as:** namespace `webmail.*` di-share dengan controller di `nawasara/core` (`WebmailLaunchController`) tapi declared di sini karena WHM API yang mint Roundcube session. Kalau install nawasara/core tanpa nawasara/whm, permission `webmail.*` tidak akan ada di DB dan launch akan ditolak — install kedua package, atau hapus tombol launch dari UI.
 
 ---
 

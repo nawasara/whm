@@ -368,7 +368,7 @@ class Table extends Component
      */
     public function openLaunchAs(string $username, ?string $domain = null): void
     {
-        Gate::authorize('cpanel.session.launch_as');
+        Gate::authorize('whm.cpanel.launch_as');
 
         $this->launchAsUsername = $username;
         $this->launchAsDomain = $domain ?? '';
@@ -393,7 +393,7 @@ class Table extends Component
      */
     public function confirmLaunchAs(WebmailSessionService $service)
     {
-        Gate::authorize('cpanel.session.launch_as');
+        Gate::authorize('whm.cpanel.launch_as');
 
         $this->validate([
             'launchAsUsername' => 'required|string|max:64',
