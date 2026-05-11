@@ -19,7 +19,7 @@
         </div>
     @else
         {{-- Search form card --}}
-        <form wire:submit.prevent="search" class="mb-4 p-4 rounded-xl border border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 space-y-4">
+        <form wire:submit="search" class="mb-4 p-4 rounded-xl border border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 space-y-4">
             <div class="flex items-center justify-between">
                 <h3 class="font-semibold text-gray-700 dark:text-neutral-300">Filter Pencarian</h3>
                 <x-nawasara-whm::server-switcher :servers="$this->servers" role="mail" />
