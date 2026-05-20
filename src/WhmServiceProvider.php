@@ -43,6 +43,13 @@ class WhmServiceProvider extends ServiceProvider
                 return;
             }
 
+            // Skip scheduler registration when disabled — e.g. deployment
+            // without WHM API credentials, where these tasks would only
+            // fail every run and spam the log.
+            if (! config('nawasara-whm.scheduler.enabled', true)) {
+                return;
+            }
+
             $schedule = $this->app->make(Schedule::class);
 
             $schedule->command('whm:sync-accounts')

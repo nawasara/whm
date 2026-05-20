@@ -18,4 +18,12 @@ return [
     // Usage threshold for "near limit" warning (percent)
     'usage_warning_threshold' => 80,
     'usage_critical_threshold' => 95,
+
+    // Scheduler — registers whm:sync-accounts + whm:sync-emails on the
+    // Laravel schedule. Set WHM_SCHEDULER_ENABLED=false to skip registering
+    // them, e.g. when the deployment has no WHM API credentials yet (the
+    // scheduled tasks would just fail every run and spam the log).
+    'scheduler' => [
+        'enabled' => env('WHM_SCHEDULER_ENABLED', true),
+    ],
 ];
