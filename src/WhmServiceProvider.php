@@ -10,6 +10,8 @@ use Symfony\Component\Finder\Finder;
 use Illuminate\Support\ServiceProvider;
 use Nawasara\Whm\Console\Commands\SyncAccountsCommand;
 use Nawasara\Whm\Console\Commands\SyncEmailsCommand;
+use Nawasara\Whm\Jobs\Account\SyncWhmAccountsJob;
+use Nawasara\Whm\Jobs\Email\SyncWhmEmailsJob;
 use Nawasara\Whm\Services\EmailStatsAggregator;
 use Nawasara\Whm\Services\EximClient;
 use Nawasara\Whm\Services\MailSecurityAggregator;
@@ -52,22 +54,58 @@ class WhmServiceProvider extends ServiceProvider
 
             $schedule = $this->app->make(Schedule::class);
 
-            $schedule->command('whm:sync-accounts')
+            // Dispatch jobs via $schedule->call() — NOT $schedule->command().
+            // Package console commands registered through $this->commands() do
+            // not reliably surface in the Artisan kernel when the scheduler
+            // boots, so `$schedule->command('whm:sync-accounts')` silently dies
+            // with "no commands defined in the whm namespace" every run (the
+            // task fires, php artisan errors, output is sent to /dev/null →
+            // sync never happens, no failed_jobs row). Dispatching the job
+            // straight from the scheduler process avoids the kernel lookup.
+            // Mirrors the command handlers: loop instances by role, queue one
+            // job each. See reference: schedule via $schedule->call().
+            $schedule->call(function () {
+                $whm = $this->app->make(WhmClient::class);
+                foreach ($whm->instancesByRole('hosting') as $name) {
+                    SyncWhmAccountsJob::dispatch(
+                        instance: $name,
+                        triggerSource: 'scheduled',
+                    );
+                }
+            })
+                ->name('whm:sync-accounts')
                 ->everyThirtyMinutes()
-                ->withoutOverlapping(25)
-                ->runInBackground();
+                ->withoutOverlapping(25);
 
             // Sync email accounts dari WHM ke DB snapshot — every hour
-            $schedule->command('whm:sync-emails')
+            $schedule->call(function () {
+                $whm = $this->app->make(WhmClient::class);
+                foreach ($whm->instancesByRole('mail') as $name) {
+                    SyncWhmEmailsJob::dispatch(
+                        instance: $name,
+                        payload: ['with_disk' => false],
+                        triggerSource: 'scheduled',
+                    );
+                }
+            })
+                ->name('whm:sync-emails')
                 ->hourly()
-                ->withoutOverlapping(50)
-                ->runInBackground();
+                ->withoutOverlapping(50);
 
             // Heavy disk usage sync — daily at 02:00 (jangan ganggu jam kerja)
-            $schedule->command('whm:sync-emails --with-disk')
+            $schedule->call(function () {
+                $whm = $this->app->make(WhmClient::class);
+                foreach ($whm->instancesByRole('mail') as $name) {
+                    SyncWhmEmailsJob::dispatch(
+                        instance: $name,
+                        payload: ['with_disk' => true],
+                        triggerSource: 'scheduled',
+                    );
+                }
+            })
+                ->name('whm:sync-emails-disk')
                 ->dailyAt('02:00')
-                ->withoutOverlapping(60)
-                ->runInBackground();
+                ->withoutOverlapping(60);
         });
     }
 
