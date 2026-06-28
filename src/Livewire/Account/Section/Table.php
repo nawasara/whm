@@ -35,6 +35,8 @@ class Table extends Component
     #[Url(except: '')]
     public string $server = '';
 
+    // #[Url] so the command palette can deep-link ?search=<term> and prefill.
+    #[Url(except: '')]
     public string $search = '';
 
     /**
