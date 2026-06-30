@@ -180,13 +180,39 @@ class SshConnection
         $sshHost = Vault::get('whm', 'ssh_host', $this->instance) ?: null;
         $whmHost = Vault::get('whm', 'host', $this->instance);
 
-        // Fallback: parse host from WHM URL when ssh_host not set
+        // Fallback: parse host from WHM URL when ssh_host not set.
+        // e.g. 'https://whm.example.com:2087' → host='whm.example.com'
         if (! $sshHost && $whmHost) {
             $parsed = parse_url($whmHost);
             $sshHost = $parsed['host'] ?? null;
+
+            // parse_url without a scheme treats the whole string as path,
+            // not host. e.g. parse_url('10.1.1.5') → ['path'=>'10.1.1.5'].
+            // Retry with added scheme so bare IPs/hostnames are parsed correctly.
+            if (! $sshHost && $whmHost) {
+                $retried = parse_url('ssh://'.$whmHost);
+                $sshHost = $retried['host'] ?? null;
+            }
         }
 
-        $port = Vault::get('whm', 'ssh_port', $this->instance) ?: 22;
+        // Guard: if ssh_host looks like a bare port number (e.g. '6416'), the user
+        // accidentally filled the SSH Port value into the SSH Host field in Vault.
+        if ($sshHost && ctype_digit(ltrim($sshHost, '0'))) {
+            throw new RuntimeException(
+                "SSH Host Vault value \"{$sshHost}\" looks like a port number, not a hostname. ".
+                'Periksa konfigurasi Vault WHM: isi SSH Host dengan IP/hostname server, bukan nomor port.'
+            );
+        }
+
+        $port = Vault::get('whm', 'ssh_port', $this->instance);
+        // Guard: if ssh_port contains non-numeric characters (e.g. a hostname
+        // accidentally placed there), default to 22 and let the error surface
+        // through the connection attempt rather than producing '0'.
+        if ($port !== null && $port !== '' && ! ctype_digit(ltrim((string) $port, ' '))) {
+            $port = 22;
+        }
+        $port = $port ?: 22;
+
         $user = Vault::get('whm', 'ssh_user', $this->instance) ?: 'root';
         $key = Vault::get('whm', 'ssh_key', $this->instance);
 
