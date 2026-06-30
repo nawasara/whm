@@ -176,7 +176,10 @@ class SyncWhmEmailsJob extends AbstractSyncJob
     protected function parseToMb($input): ?int
     {
         if (is_numeric($input)) {
-            return (int) $input;
+            $val = (float) $input;
+            // WHM API kadang return bytes (bukan MB) — nilai > 100_000 hampir pasti bytes.
+            // 100_000 MB = 100 GB, tidak mungkin quota email individual sebesar itu.
+            return $val > 100_000 ? (int) round($val / 1_048_576) : (int) $val;
         }
         $s = strtoupper(trim((string) $input));
         if (! preg_match('/^([\d.]+)\s*(K|M|G|T)?B?$/', $s, $m)) {
