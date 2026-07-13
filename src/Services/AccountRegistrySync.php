@@ -18,7 +18,7 @@ class AccountRegistrySync
      *     refresh identifier and status.
      *  2. Else, if there's an existing unlinked asset with matching identifier
      *     (domain), attach package_ref + external_id.
-     *  3. Else, create new unassigned asset for manual OPD/PIC assignment.
+     *  3. Else, create new unassigned asset for manual OPD/penanggung jawab assignment.
      */
     public function sync(): array
     {
@@ -99,7 +99,7 @@ class AccountRegistrySync
 
                 Asset::create([
                     'opd_id' => null,
-                    'pic_id' => null,
+                    'pj_user_id' => null,
                     'type' => 'hosting_account',
                     'identifier' => $domain,
                     'package_ref' => 'whm',

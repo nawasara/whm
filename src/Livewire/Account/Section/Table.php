@@ -9,7 +9,9 @@ use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
+use Nawasara\Keycloak\Support\KeycloakProfile;
 use Nawasara\Registry\Models\Asset;
+use Nawasara\Registry\Models\Membership;
 use Nawasara\Ui\Livewire\Concerns\HasBrowserToast;
 use Nawasara\Ui\Livewire\Concerns\HasExport;
 use Nawasara\Whm\Exceptions\WebmailSessionException;
@@ -59,7 +61,7 @@ class Table extends Component
     public string $formEmail = '';
     public string $formPackage = '';
     public $formOpdId = '';
-    public $formPicId = '';
+    public $formPjUserId = '';
 
     // Password change modal
     public string $pwUsername = '';
@@ -165,9 +167,32 @@ class Table extends Component
 
         return Asset::where('package_ref', 'whm')
             ->whereIn('external_id', $usernames)
-            ->with(['opd:id,name,code', 'pic:id,name'])
+            ->with(['opd:id,name,code', 'penanggungJawab'])
             ->get()
             ->keyBy('external_id');
+    }
+
+    /**
+     * Candidate penanggung jawab list untuk OPD yang dipilih di form create.
+     * Diambil dari membership registry (user ↔ OPD), bukan lagi tabel Pic.
+     * Key = user_id, value = nama dari KeycloakProfile.
+     *
+     * @return array<int, string>
+     */
+    #[Computed]
+    public function pjCandidates(): array
+    {
+        if (! $this->formOpdId) {
+            return [];
+        }
+
+        return Membership::where('opd_id', $this->formOpdId)
+            ->where('aktif', true)
+            ->with('user')
+            ->get()
+            ->filter(fn ($m) => $m->user !== null)
+            ->mapWithKeys(fn ($m) => [$m->user_id => KeycloakProfile::for($m->user)->name])
+            ->all();
     }
 
     public function updatedServer(): void { $this->resetPage(); $this->resetSelection(); }
@@ -225,7 +250,7 @@ class Table extends Component
 
         $this->reset([
             'formUsername', 'formDomain', 'formPassword',
-            'formEmail', 'formPackage', 'formOpdId', 'formPicId',
+            'formEmail', 'formPackage', 'formOpdId', 'formPjUserId',
         ]);
         $this->dispatch('modal-open:whm-account-form');
     }
@@ -258,7 +283,7 @@ class Table extends Component
                     'type' => 'hosting_account',
                     'identifier' => $this->formDomain,
                     'opd_id' => $this->formOpdId ?: null,
-                    'pic_id' => $this->formPicId ?: null,
+                    'pj_user_id' => $this->formPjUserId ?: null,
                     'status' => 'active',
                     'registered_at' => now(),
                     'notes' => 'WHM account: '.$this->formUsername.' on '.($this->server ?: 'default'),
@@ -632,7 +657,7 @@ class Table extends Component
 
     /**
      * Export FULL account list for the active server (no filter) per spec.
-     * Includes registry-mapped OPD/PIC for downstream audit.
+     * Includes registry-mapped OPD/penanggung jawab for downstream audit.
      */
     protected function exportData(): iterable
     {
@@ -644,12 +669,13 @@ class Table extends Component
         $assetMap = Asset::query()
             ->where('package_ref', 'whm')
             ->whereIn('external_id', $accounts->pluck('username')->filter()->all())
-            ->with(['opd:id,name,code', 'pic:id,name'])
+            ->with(['opd:id,name,code', 'penanggungJawab'])
             ->get()
             ->keyBy('external_id');
 
         return $accounts->map(function (WhmAccount $a) use ($assetMap) {
             $asset = $assetMap[$a->username] ?? null;
+            $pj = $asset ? $asset->pjProfile() : null;
             return [
                 'Server' => $a->instance,
                 'Username' => $a->username,
@@ -666,7 +692,9 @@ class Table extends Component
                 'Bandwidth Limit MB' => $a->bandwidth_limit_mb,
                 'Inodes Used' => $a->inodes_used,
                 'OPD' => $asset?->opd?->name,
-                'PIC' => $asset?->pic?->name,
+                'Penanggung Jawab' => $asset?->penanggungJawab ? $pj?->name : null,
+                'NIP' => $asset?->penanggungJawab ? $pj?->nip : null,
+                'WhatsApp' => $asset?->penanggungJawab ? $pj?->whatsapp : null,
                 'WHM Created' => optional($a->start_date)->format('Y-m-d'),
                 'Last Synced' => optional($a->last_synced_at)->format('Y-m-d H:i'),
             ];

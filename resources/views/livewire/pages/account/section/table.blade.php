@@ -104,7 +104,7 @@
             $selectAllHeader = '<input type="checkbox" wire:model.live="selectAll" class="size-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 dark:bg-neutral-800 dark:border-neutral-600">';
         @endphp
         <x-nawasara-ui::table stickyLast
-            :headers="[$selectAllHeader, 'Username', 'Domain', 'OPD / PIC', 'Package', 'Disk', 'Status', 'Sync', '']">
+            :headers="[$selectAllHeader, 'Username', 'Domain', 'OPD / PJ', 'Package', 'Disk', 'Status', 'Sync', '']">
             <x-slot:table>
                 @forelse ($this->accounts as $acct)
                     @php $asset = $this->assetMap[$acct->username] ?? null; @endphp
@@ -123,8 +123,8 @@
                             @if ($asset && $asset->opd)
                                 <div class="flex flex-col">
                                     <span class="font-medium text-gray-800 dark:text-neutral-200">{{ $asset->opd->name }}</span>
-                                    @if ($asset->pic)
-                                        <span class="text-xs text-gray-500 dark:text-neutral-400">PIC: {{ $asset->pic->name }}</span>
+                                    @if ($asset->penanggungJawab)
+                                        <span class="text-xs text-gray-500 dark:text-neutral-400">PJ: {{ $asset->pjProfile()->name }}</span>
                                     @endif
                                 </div>
                             @elseif ($asset)
@@ -230,14 +230,10 @@
                     </x-nawasara-ui::form.select>
                 </div>
                 <div>
-                    <x-nawasara-ui::form.label value="PIC (opsional)" />
-                    <x-nawasara-ui::form.select wire:model="formPicId" placeholder="-- Pilih PIC --">
-                        @if ($formOpdId)
-                            @foreach (\Nawasara\Registry\Models\Pic::where('opd_id', $formOpdId)->orderBy('name')->get(['id', 'name']) as $pic)
-                                <option value="{{ $pic->id }}">{{ $pic->name }}</option>
-                            @endforeach
-                        @endif
-                    </x-nawasara-ui::form.select>
+                    <x-nawasara-ui::form.label value="Penanggung Jawab (opsional)" />
+                    <x-nawasara-ui::form.select wire:model="formPjUserId"
+                        :options="$this->pjCandidates"
+                        :placeholder="$formOpdId ? '-- Pilih Penanggung Jawab --' : '-- Pilih OPD dulu --'" />
                 </div>
             </div>
         </form>

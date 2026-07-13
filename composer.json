@@ -1,6 +1,6 @@
 {
     "name": "nawasara/whm",
-    "description": "WHM/cPanel hosting and email operations dashboard for the Nawasara superapp framework — accounts, packages, email accounts, mail queue, mail log search, email statistics, and mail security.",
+    "description": "WHM/cPanel hosting and email operations dashboard for the Nawasara superapp framework \u2014 accounts, packages, email accounts, mail queue, mail log search, email statistics, and mail security.",
     "type": "library",
     "license": "MIT",
     "keywords": [
@@ -34,6 +34,7 @@
         "illuminate/support": "^10.0|^12.0",
         "spatie/laravel-permission": "^6.0",
         "nawasara/ui": "*",
+        "nawasara/keycloak": "*",
         "nawasara/search": "*",
         "nawasara/sync": "*",
         "nawasara/vault": "*",
