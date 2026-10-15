@@ -286,13 +286,17 @@ class EximClient
             if (preg_match('/[\\\\$`\n\r;|&<>]/', $value)) {
                 throw new \InvalidArgumentException("Invalid characters in {$key} filter");
             }
-            $pipeline[] = 'grep -F -i '.escapeshellarg($value);
+            // Audit keamanan 15 Oktober 2026 (R12): escapeshellarg saja tidak
+            // cukup. Nilai yang diawali '-' (mis. `--file=/etc/shadow`) tetap
+            // dibaca grep sebagai OPSI, padahal perintah ini jalan sebagai
+            // root lewat SSH. `-e` memaksa nilai dibaca sebagai pola.
+            $pipeline[] = 'grep -F -i -e '.escapeshellarg($value);
         }
 
         $status = $filters['status'] ?? '';
         $statusGrep = $this->statusToGrepPattern($status);
         if ($statusGrep !== null) {
-            $pipeline[] = 'grep -F '.escapeshellarg($statusGrep);
+            $pipeline[] = 'grep -F -e '.escapeshellarg($statusGrep);
         }
 
         // Take last N matches (newest first after reverse).
@@ -332,7 +336,9 @@ class EximClient
         $this->assertValidMessageId($messageId);
 
         $path = escapeshellarg(self::DEFAULT_MAINLOG);
-        $cmd = sprintf('grep -F %s %s 2>/dev/null', escapeshellarg($messageId), $path);
+        // `-e` untuk konsistensi dengan searchLog() (audit R12), meski id
+        // sudah divalidasi bentuknya di atas.
+        $cmd = sprintf('grep -F -e %s %s 2>/dev/null', escapeshellarg($messageId), $path);
 
         $output = $this->ssh->withTimeout(60)->exec($cmd);
 

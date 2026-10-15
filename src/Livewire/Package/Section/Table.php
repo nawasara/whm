@@ -7,6 +7,8 @@ use Livewire\Component;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
+use Nawasara\AuthPrimitives\Attributes\RequiresSudo;
+use Nawasara\AuthPrimitives\Traits\WithSudo;
 use Nawasara\Ui\Livewire\Concerns\HasBrowserToast;
 use Nawasara\Whm\Livewire\Concerns\HasServerRole;
 use Nawasara\Whm\Services\WhmClient;
@@ -15,6 +17,7 @@ class Table extends Component
 {
     use HasBrowserToast;
     use HasServerRole;
+    use WithSudo;
 
     protected function serverRole(): string
     {
@@ -143,6 +146,8 @@ class Table extends Component
         }
     }
 
+    // Audit keamanan 15 Oktober 2026 (S6): hapus package WHM wajib sudo.
+    #[RequiresSudo(reason: 'menghapus package hosting')]
     public function deletePackage(string $name): void
     {
         Gate::authorize('whm.package.manage');

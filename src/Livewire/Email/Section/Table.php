@@ -6,10 +6,13 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
+use Nawasara\AuthPrimitives\Attributes\RequiresSudo;
+use Nawasara\AuthPrimitives\Traits\WithSudo;
 use Nawasara\Ui\Livewire\Concerns\HasBrowserToast;
 use Nawasara\Ui\Livewire\Concerns\HasExport;
 use Nawasara\Whm\Exceptions\WebmailSessionException;
@@ -26,6 +29,7 @@ class Table extends Component
     use HasExport;
     use HasServerRole;
     use WithPagination;
+    use WithSudo;
 
     protected function serverRole(): string
     {
@@ -53,15 +57,22 @@ class Table extends Component
     public string $formPassword = '';
     public int $formQuota = 250;
 
+    // Audit keamanan 15 Oktober 2026: target aksi (alamat email, id) hanya
+    // diisi server lewat openX(), jadi dikunci dengan #[Locked] supaya
+    // payload wire tidak dapat mengalihkan aksi ke mailbox lain.
+
     // Password change modal
+    #[Locked]
     public string $pwEmail = '';
     public string $pwNewPassword = '';
 
     // Quota change modal
+    #[Locked]
     public string $quotaEmail = '';
     public int $quotaNew = 250;
 
     // Detail modal
+    #[Locked]
     public ?int $detailId = null;
 
     // Bulk selection (array of email account IDs)
@@ -78,6 +89,7 @@ class Table extends Component
     // password/quota modal supaya state tidak bocor antar flow — admin yang
     // baru saja edit password bisa langsung klik "Buka sebagai" tanpa stale
     // form data.
+    #[Locked]
     public string $launchAsEmail = '';
     public string $launchAsReason = '';
 
@@ -307,6 +319,9 @@ class Table extends Component
 
     // ─── Delete ─────────────────────────────────────────
 
+    // Audit keamanan 15 Oktober 2026 (S6): menghapus mailbox beserta isinya
+    // permanen, jadi wajib sudo (AGENTS.md §6).
+    #[RequiresSudo(reason: 'menghapus akun email')]
     public function delete(string $email): void
     {
         Gate::authorize('whm.email.manage');
@@ -571,6 +586,8 @@ class Table extends Component
         $this->resetSelection();
     }
 
+    // Audit keamanan 15 Oktober 2026 (S6): sama seperti delete(), massal.
+    #[RequiresSudo(reason: 'menghapus banyak akun email')]
     public function bulkDelete(): void
     {
         Gate::authorize('whm.email.manage');
@@ -646,6 +663,10 @@ class Table extends Component
      */
     protected function exportData(): iterable
     {
+        // Audit keamanan 15 Oktober 2026: export() dapat dipanggil langsung
+        // lewat payload wire, jadi izin lihat diperiksa ulang di sini.
+        Gate::authorize('whm.email.view');
+
         return WhmEmailAccount::forInstance($this->server)
             ->orderBy('domain')
             ->orderBy('local_part')

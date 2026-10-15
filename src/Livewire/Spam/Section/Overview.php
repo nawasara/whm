@@ -147,11 +147,17 @@ class Overview extends Component
 
     public function loadStats(): void
     {
+        // Audit keamanan 15 Oktober 2026 (R4): aksi publik Livewire yang
+        // memicu baca data lewat SSH tetap diperiksa izinnya.
+        Gate::authorize('whm.spam.view');
+
         $this->loaded = true;
     }
 
     public function refresh(): void
     {
+        Gate::authorize('whm.spam.view');
+
         foreach (['todayCounts', 'trend', 'trendMax', 'topIps', 'topTargets', 'recent'] as $prop) {
             unset($this->{$prop});
         }

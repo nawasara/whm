@@ -180,11 +180,17 @@ class Overview extends Component
      */
     public function loadStats(): void
     {
+        // Audit keamanan 15 Oktober 2026 (R4): aksi publik Livewire yang
+        // memicu baca data lewat SSH tetap diperiksa izinnya.
+        Gate::authorize('whm.emailstats.view');
+
         $this->loaded = true;
     }
 
     public function refresh(): void
     {
+        Gate::authorize('whm.emailstats.view');
+
         // Bust all computed memoization so wire:click "Refresh" re-fetches.
         foreach (['todayCounts', 'queueSize', 'trend', 'trendMax', 'topSenders', 'topDomains', 'hourly', 'hourlyMax'] as $prop) {
             unset($this->{$prop});

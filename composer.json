@@ -40,7 +40,8 @@
         "nawasara/vault": "*",
         "nawasara/registry": "*",
         "livewire/livewire": "^3.0",
-        "phpseclib/phpseclib": "^3.0"
+        "phpseclib/phpseclib": "^3.0",
+        "nawasara/auth-primitives": "*"
     },
     "extra": {
         "laravel": {

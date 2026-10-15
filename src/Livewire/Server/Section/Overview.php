@@ -2,6 +2,7 @@
 
 namespace Nawasara\Whm\Livewire\Server\Section;
 
+use Illuminate\Support\Facades\Gate;
 use Livewire\Component;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Url;
@@ -78,6 +79,10 @@ class Overview extends Component
 
     public function refresh(): void
     {
+        // Audit keamanan 15 Oktober 2026 (R4): refresh mengosongkan cache dan
+        // memanggil WHM API, jadi izin lihat diperiksa ulang.
+        Gate::authorize('whm.server.view');
+
         $this->client()->flushCache();
         unset($this->status, $this->accountsCount);
         $this->toastSuccess('Server status di-refresh');

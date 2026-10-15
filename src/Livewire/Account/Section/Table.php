@@ -5,10 +5,13 @@ namespace Nawasara\Whm\Livewire\Account\Section;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
+use Nawasara\AuthPrimitives\Attributes\RequiresSudo;
+use Nawasara\AuthPrimitives\Traits\WithSudo;
 use Nawasara\Keycloak\Support\KeycloakProfile;
 use Nawasara\Registry\Models\Asset;
 use Nawasara\Registry\Models\Membership;
@@ -28,6 +31,7 @@ class Table extends Component
     use HasExport;
     use HasServerRole;
     use WithPagination;
+    use WithSudo;
 
     protected function serverRole(): string
     {
@@ -63,15 +67,22 @@ class Table extends Component
     public $formOpdId = '';
     public $formPjUserId = '';
 
+    // Audit keamanan 15 Oktober 2026: target aksi (username, id) hanya
+    // diisi server lewat openX(), jadi dikunci dengan #[Locked] supaya
+    // payload wire tidak dapat mengalihkan aksi ke akun lain.
+
     // Password change modal
+    #[Locked]
     public string $pwUsername = '';
     public string $pwNewPassword = '';
 
     // Suspend modal
+    #[Locked]
     public string $suspendUsername = '';
     public string $suspendReason = '';
 
     // Detail modal
+    #[Locked]
     public ?int $detailId = null;
 
     // Bulk selection
@@ -84,7 +95,9 @@ class Table extends Component
     // Launch-as (admin impersonation) modal state. Mirror flow di
     // Email\Section\Table — admin klik "Buka cPanel", isi alasan, lalu
     // tab baru terbuka langsung di cPanel sebagai user pemilik akun.
+    #[Locked]
     public string $launchAsUsername = '';
+    #[Locked]
     public string $launchAsDomain = '';
     public string $launchAsReason = '';
 
@@ -364,6 +377,9 @@ class Table extends Component
 
     // ─── Terminate ──────────────────────────────────────
 
+    // Audit keamanan 15 Oktober 2026 (S6): terminate menghapus akun hosting
+    // beserta seluruh datanya, jadi wajib sudo (AGENTS.md §6).
+    #[RequiresSudo(reason: 'menghapus akun hosting')]
     public function terminate(string $username): void
     {
         Gate::authorize('whm.account.terminate');
@@ -661,6 +677,10 @@ class Table extends Component
      */
     protected function exportData(): iterable
     {
+        // Audit keamanan 15 Oktober 2026: export() dapat dipanggil langsung
+        // lewat payload wire, jadi izin lihat diperiksa ulang di sini.
+        Gate::authorize('whm.account.view');
+
         $accounts = WhmAccount::forInstance($this->server)
             ->orderBy('username')
             ->get();

@@ -4,8 +4,11 @@ namespace Nawasara\Whm\Livewire\MailQueue\Section;
 
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use Nawasara\AuthPrimitives\Attributes\RequiresSudo;
+use Nawasara\AuthPrimitives\Traits\WithSudo;
 use Nawasara\Ui\Livewire\Concerns\HasBrowserToast;
 use Nawasara\Whm\Livewire\Concerns\HasServerRole;
 use Nawasara\Whm\Services\EximClient;
@@ -15,6 +18,7 @@ class Table extends Component
 {
     use HasBrowserToast;
     use HasServerRole;
+    use WithSudo;
 
     protected function serverRole(): string
     {
@@ -50,6 +54,8 @@ class Table extends Component
     public bool $selectAll = false;
 
     /** Detail modal state. */
+    // Audit keamanan 15 Oktober 2026: hanya diisi server (openDetail).
+    #[Locked]
     public ?string $detailId = null;
     public ?string $detailHeaders = null;
     public ?string $detailBody = null;
@@ -207,6 +213,10 @@ class Table extends Component
 
     public function refresh(): void
     {
+        // Audit keamanan 15 Oktober 2026 (R4): memicu baca antrean lewat SSH,
+        // jadi tetap butuh izin lihat meskipun dipanggil langsung lewat wire.
+        Gate::authorize('whm.mailqueue.view');
+
         // Force re-fetch by clearing the computed memoization.
         unset($this->allItems);
         $this->resetSelection();
@@ -214,6 +224,8 @@ class Table extends Component
 
     public function loadQueue(): void
     {
+        Gate::authorize('whm.mailqueue.view');
+
         $this->loaded = true;
     }
 
@@ -251,6 +263,9 @@ class Table extends Component
 
     // ─── Single-row actions ─────────────────────────────
 
+    // Audit keamanan 15 Oktober 2026 (S6): aksi hapus/paksa antrean mail
+    // wajib sudo (AGENTS.md §6, delete* dan force*).
+    #[RequiresSudo(reason: 'menghapus pesan dari antrean mail')]
     public function deleteOne(string $messageId): void
     {
         Gate::authorize('whm.mailqueue.manage');
@@ -299,6 +314,7 @@ class Table extends Component
         }
     }
 
+    #[RequiresSudo(reason: 'memaksa pengiriman pesan dari antrean mail')]
     public function forceOne(string $messageId): void
     {
         Gate::authorize('whm.mailqueue.manage');
@@ -333,6 +349,7 @@ class Table extends Component
 
     // ─── Bulk actions ───────────────────────────────────
 
+    #[RequiresSudo(reason: 'menghapus banyak pesan dari antrean mail')]
     public function bulkDelete(): void
     {
         Gate::authorize('whm.mailqueue.manage');
@@ -375,6 +392,7 @@ class Table extends Component
         $this->refresh();
     }
 
+    #[RequiresSudo(reason: 'memaksa pengiriman banyak pesan dari antrean mail')]
     public function bulkForce(): void
     {
         Gate::authorize('whm.mailqueue.manage');
@@ -399,6 +417,7 @@ class Table extends Component
         $this->refresh();
     }
 
+    #[RequiresSudo(reason: 'memaksa pengiriman seluruh antrean mail')]
     public function flushAll(): void
     {
         Gate::authorize('whm.mailqueue.manage');
