@@ -12,6 +12,7 @@ use Nawasara\Whm\Console\Commands\SyncAccountsCommand;
 use Nawasara\Whm\Console\Commands\SyncEmailsCommand;
 use Nawasara\Whm\Jobs\Account\SyncWhmAccountsJob;
 use Nawasara\Whm\Jobs\Email\SyncWhmEmailsJob;
+use Nawasara\Whm\Jobs\Email\SyncWhmMailboxLinksJob;
 use Nawasara\Whm\Services\EmailStatsAggregator;
 use Nawasara\Whm\Services\EximClient;
 use Nawasara\Whm\Services\MailSecurityAggregator;
@@ -91,6 +92,22 @@ class WhmServiceProvider extends ServiceProvider
                 ->name('whm:sync-emails')
                 ->hourly()
                 ->withoutOverlapping(50);
+
+            // External Authentication links (mailbox ↔ NIP) — every 30 minutes.
+            // The ASN account portal grants mailbox access from these, so a
+            // link removed in cPanel must stop working soon after.
+            $schedule->call(function () {
+                $whm = $this->app->make(WhmClient::class);
+                foreach ($whm->instancesByRole('mail') as $name) {
+                    SyncWhmMailboxLinksJob::dispatch(
+                        instance: $name,
+                        triggerSource: 'scheduled',
+                    );
+                }
+            })
+                ->name('whm:sync-mailbox-links')
+                ->everyThirtyMinutes()
+                ->withoutOverlapping(25);
 
             // Heavy disk usage sync — daily at 02:00 (jangan ganggu jam kerja)
             $schedule->call(function () {
