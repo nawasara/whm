@@ -15,6 +15,7 @@ A WHM/cPanel management dashboard for Nawasara. Manage OPD hosting accounts, ema
 - **Mail Queue**: list the Exim queue over SSH, force/freeze/thaw/bounce/delete, with a delivery log per message
 - **Mail Log Search**: search the Exim log by date, sender, recipient, message-id, or status, with a trace mode that shows the full event chain per message
 - **Email Stats**: a real-time dashboard for received/delivered/bounced/deferred/spam, a trend chart over 3 to 30 days, top senders and domains, and hourly volume
+- **Auto-responder and forwarders** (`WhmClient`): `get/set/deleteAutoResponder`, `listForwarders`, `addForwarder`, `deleteForwarder` over UAPI. Used by the ASN account portal (`nawasara/asn-portal`), which restricts forwarding destinations to `ponorogo.go.id`; the client itself does not.
 - **Mail Security**: rejected SMTP analysis, categorizing auth_fail/RBL/unknown_user/spam, top blocked IPs, and top targeted accounts (brute force detection)
 
 ### Cross-cutting

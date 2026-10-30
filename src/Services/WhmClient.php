@@ -645,6 +645,122 @@ class WhmClient
     }
 
     /**
+     * Current auto-responder of a mailbox, or null when none is set.
+     * UAPI: Email::get_auto_responder
+     *
+     * @return array{subject: ?string, body: ?string, from: ?string, start: ?int, stop: ?int, interval: ?int}|null
+     */
+    public function getAutoResponder(string $cpanelUser, string $email): ?array
+    {
+        $result = $this->uapi($cpanelUser, 'Email', 'get_auto_responder', ['email' => $email]);
+
+        $data = $result['success'] ? ($result['data'] ?? []) : [];
+
+        if (! is_array($data) || ($data['subject'] ?? '') === '' && ($data['body'] ?? '') === '') {
+            return null;
+        }
+
+        return [
+            'subject' => $data['subject'] ?? null,
+            'body' => $data['body'] ?? null,
+            'from' => $data['from'] ?? null,
+            'start' => isset($data['start']) ? (int) $data['start'] : null,
+            'stop' => isset($data['stop']) ? (int) $data['stop'] : null,
+            'interval' => isset($data['interval']) ? (int) $data['interval'] : null,
+        ];
+    }
+
+    /**
+     * Set (or replace) a mailbox's auto-responder, plain text.
+     * UAPI: Email::add_auto_responder
+     *
+     * @param  int|null  $start  unix time; null = from now
+     * @param  int|null  $stop   unix time; null = until removed
+     * @param  int  $intervalHours  reply to the same sender at most once per N hours
+     */
+    public function setAutoResponder(string $cpanelUser, string $email, string $from, string $subject, string $body, ?int $start = null, ?int $stop = null, int $intervalHours = 24): array
+    {
+        [$localPart, $domain] = array_pad(explode('@', $email, 2), 2, null);
+
+        $params = [
+            'email' => $localPart,
+            'domain' => $domain,
+            'from' => $from,
+            'subject' => $subject,
+            'body' => $body,
+            'is_html' => 0,
+            'interval' => $intervalHours,
+            'charset' => 'utf-8',
+        ];
+
+        if ($start !== null) {
+            $params['start'] = $start;
+        }
+
+        if ($stop !== null) {
+            $params['stop'] = $stop;
+        }
+
+        $result = $this->uapi($cpanelUser, 'Email', 'add_auto_responder', $params, 'post');
+
+        return ['success' => $result['success'], 'message' => $result['errors'][0] ?? ''];
+    }
+
+    /** UAPI: Email::delete_auto_responder */
+    public function deleteAutoResponder(string $cpanelUser, string $email): bool
+    {
+        return $this->uapi($cpanelUser, 'Email', 'delete_auto_responder', ['email' => $email], 'post')['success'];
+    }
+
+    /**
+     * Forwarders of one address: the destinations mail to $email is copied to.
+     * UAPI: Email::list_forwarders (filtered by domain, then by address).
+     *
+     * @return list<string>  destination addresses
+     */
+    public function listForwarders(string $cpanelUser, string $email): array
+    {
+        [, $domain] = array_pad(explode('@', $email, 2), 2, null);
+
+        $result = $this->uapi($cpanelUser, 'Email', 'list_forwarders', ['domain' => $domain]);
+
+        if (! $result['success']) {
+            return [];
+        }
+
+        return collect($result['data'] ?? [])
+            ->filter(fn ($row) => strcasecmp((string) ($row['dest'] ?? ''), $email) === 0)
+            ->pluck('forward')
+            ->filter(fn ($f) => is_string($f) && $f !== '')
+            ->values()
+            ->all();
+    }
+
+    /** Copy mail for $email to $destination. UAPI: Email::add_forwarder */
+    public function addForwarder(string $cpanelUser, string $email, string $destination): array
+    {
+        [, $domain] = array_pad(explode('@', $email, 2), 2, null);
+
+        $result = $this->uapi($cpanelUser, 'Email', 'add_forwarder', [
+            'domain' => $domain,
+            'email' => $email,
+            'fwdopt' => 'fwd',
+            'fwdemail' => $destination,
+        ], 'post');
+
+        return ['success' => $result['success'], 'message' => $result['errors'][0] ?? ''];
+    }
+
+    /** UAPI: Email::delete_forwarder */
+    public function deleteForwarder(string $cpanelUser, string $email, string $destination): bool
+    {
+        return $this->uapi($cpanelUser, 'Email', 'delete_forwarder', [
+            'address' => $email,
+            'forwarder' => $destination,
+        ], 'post')['success'];
+    }
+
+    /**
      * Edit email account quota in MB. Pass 0 for unlimited.
      * UAPI: Email::edit_pop_quota
      */
