@@ -61,7 +61,7 @@
 
         {{-- Usage Table --}}
         <x-nawasara-ui::table
-            :headers="['User', 'Domain', 'Package', 'Disk', 'Bandwidth', 'Status']"
+            :headers="['User', 'Domain', 'Package', 'Disk', 'Bandwidth']"
             :title="'Resource Usage' . ($stateFilter ? ' (filter: '.ucfirst($stateFilter).')' : '')">
             <x-slot:table>
                 @forelse ($this->usageList as $row)
@@ -80,6 +80,17 @@
                     <tr>
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-800 dark:text-neutral-200 font-mono">
                             {{ $row['user'] }}
+                            {{-- Status di bawah nama, bukan kolom sendiri: terlihat tanpa menggulir ke kanan. --}}
+                            <div class="mt-1">
+                                <x-nawasara-ui::badge :color="$stateColor" dot>
+                                    {{ ucfirst($row['state']) }}
+                                </x-nawasara-ui::badge>
+                                @if ($row['suspended'])
+                                    <x-nawasara-ui::badge color="neutral" class="ml-1">
+                                        Suspended
+                                    </x-nawasara-ui::badge>
+                                @endif
+                            </div>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-neutral-300">
                             {{ $row['domain'] }}
@@ -107,20 +118,10 @@
                                 <div class="{{ $bwBarColor }} h-1.5 rounded-full" style="width: {{ min(100, $row['bw_pct']) }}%"></div>
                             </div>
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm">
-                            <x-nawasara-ui::badge :color="$stateColor" dot>
-                                {{ ucfirst($row['state']) }}
-                            </x-nawasara-ui::badge>
-                            @if ($row['suspended'])
-                                <x-nawasara-ui::badge color="neutral" class="ml-1">
-                                    Suspended
-                                </x-nawasara-ui::badge>
-                            @endif
-                        </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="6">
+                        <td colspan="5">
                             <x-nawasara-ui::empty-state
                                 icon="lucide-search-x"
                                 title="Tidak ada akun dengan status ini"

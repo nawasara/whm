@@ -106,7 +106,7 @@
             $selectAllHeader = '<input type="checkbox" wire:model.live="selectAll" class="size-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 dark:bg-neutral-800 dark:border-neutral-600">';
         @endphp
         <x-nawasara-ui::table stickyLast
-            :headers="[$selectAllHeader, 'Email', 'Status', 'Sync', '']">
+            :headers="[$selectAllHeader, 'Email', 'Sync', '']">
             <x-slot:table>
                 @forelse ($this->accounts as $acct)
                     <tr wire:key="email-{{ $acct->id }}" class="{{ in_array((string) $acct->id, $selected) ? 'bg-blue-50/50 dark:bg-blue-900/10' : '' }}">
@@ -116,13 +116,14 @@
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-800 dark:text-neutral-200 font-mono">
                             {{ $acct->email }}
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm">
-                            @if ($acct->isSuspended())
-                                <x-nawasara-ui::badge color="danger" dot>Suspended</x-nawasara-ui::badge>
-                            @else
-                                <x-nawasara-ui::badge color="success" dot>Active</x-nawasara-ui::badge>
-                            @endif
+                            {{-- Status di bawah nama, bukan kolom sendiri: terlihat tanpa menggulir ke kanan. --}}
+                            <div class="mt-1">
+                                @if ($acct->isSuspended())
+                                    <x-nawasara-ui::badge color="danger" dot>Suspended</x-nawasara-ui::badge>
+                                @else
+                                    <x-nawasara-ui::badge color="success" dot>Active</x-nawasara-ui::badge>
+                                @endif
+                            </div>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm">
                             <x-nawasara-sync::sync-badge :status="$acct->sync_status" :error="$acct->sync_error" />
@@ -145,7 +146,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="5">
+                        <td colspan="4">
                             @if ($this->lastSyncedAt === null)
                                 <x-nawasara-ui::empty-state
                                     icon="lucide-mail"

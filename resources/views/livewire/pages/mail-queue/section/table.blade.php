@@ -114,7 +114,7 @@
             $selectAllHeader = '<input type="checkbox" wire:model.live="selectAll" class="size-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 dark:bg-neutral-800 dark:border-neutral-600">';
         @endphp
         <x-nawasara-ui::table stickyLast
-            :headers="[$selectAllHeader, 'ID', 'Status', 'Age', 'Size', 'Sender', 'Recipients', '']">
+            :headers="[$selectAllHeader, 'ID', 'Age', 'Size', 'Sender', 'Recipients', '']">
             <x-slot:table>
                 @forelse ($this->pagedItems as $item)
                     <tr wire:key="qi-{{ $item['id'] }}" class="{{ in_array($item['id'], $selected) ? 'bg-blue-50/50 dark:bg-blue-900/10' : '' }}">
@@ -124,15 +124,16 @@
                         </td>
                         <td class="px-6 py-3 whitespace-nowrap text-xs font-mono text-gray-700 dark:text-neutral-300">
                             {{ $item['id'] }}
-                        </td>
-                        <td class="px-6 py-3 whitespace-nowrap text-sm">
-                            @if ($item['status'] === 'frozen')
-                                <x-nawasara-ui::badge color="danger" icon="lucide-snowflake">Frozen</x-nawasara-ui::badge>
-                            @elseif ($item['status'] === 'deferred')
-                                <x-nawasara-ui::badge color="warning">Deferred</x-nawasara-ui::badge>
-                            @else
-                                <x-nawasara-ui::badge color="primary">Queued</x-nawasara-ui::badge>
-                            @endif
+                            {{-- Status di bawah nama, bukan kolom sendiri: terlihat tanpa menggulir ke kanan. --}}
+                            <div class="mt-1">
+                                @if ($item['status'] === 'frozen')
+                                    <x-nawasara-ui::badge color="danger" icon="lucide-snowflake">Frozen</x-nawasara-ui::badge>
+                                @elseif ($item['status'] === 'deferred')
+                                    <x-nawasara-ui::badge color="warning">Deferred</x-nawasara-ui::badge>
+                                @else
+                                    <x-nawasara-ui::badge color="primary">Queued</x-nawasara-ui::badge>
+                                @endif
+                            </div>
                         </td>
                         <td class="px-6 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-neutral-400 font-mono">
                             {{ $item['age'] }}
@@ -178,7 +179,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="8">
+                        <td colspan="7">
                             @if (count($this->allItems) === 0)
                                 {{-- Celebratory empty state — queue kosong = good news,
                                      berarti tidak ada email stuck/deferred di server. --}}
