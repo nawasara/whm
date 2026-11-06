@@ -185,8 +185,23 @@ Each server **must have its own API token**. Do not share a token across servers
 
 ## Sync to Registry
 
-cPanel accounts are automatically synced to the Registry as `hosting_account` assets:
+cPanel accounts are mirrored into the Registry at the end of every account
+sync (`AccountRegistrySync`, from the local accounts table — no extra WHM
+call). Until 6 Nov 2026 this only ran from `whm:sync-accounts --registry` by
+hand, so new accounts never reached the registry and their PICs never saw
+them in Akun Kisara.
 
+- **Matching**: an asset already linked (`package_ref=whm`,
+  `external_id=username`) is refreshed; otherwise an unlinked asset with the
+  same host is linked — `hosting`, `hosting_account`, **or the site's
+  `domain`/`subdomain`**, so a PIC set on the site by hand carries over to
+  cPanel. Only then is a new `hosting_account` asset created.
+- **Status** follows suspension for `hosting_account` assets only. A linked
+  (sub)domain asset stays active: Akun Kisara hides inactive assets, and the
+  PIC must see the "hosting suspended" warning.
+- **Akun Kisara**: a PIC of a linked asset gets **Buka cPanel** — a one-time
+  `create_user_session` URL, behind a recent sign-in, logged in the same
+  cPanel session table as admin launch-as (reason "PIC lewat Akun Kisara").
 - **Scheduler**: `whm:sync-accounts` runs every 30 minutes
 - **Manual**: `php artisan whm:sync-accounts`
 - **Email accounts**: `whm:sync-emails` runs hourly (basic) plus dailyAt 02:00 with `--with-disk` (heavy)

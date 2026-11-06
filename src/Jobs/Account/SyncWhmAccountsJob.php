@@ -132,6 +132,17 @@ class SyncWhmAccountsJob extends AbstractSyncJob
 
         $whm->flushCache();
 
+        // Mirror into nawasara/registry so cPanel accounts get PICs and show
+        // up in Akun Kisara. A registry failure must not fail the WHM sync:
+        // the account data above is saved, and the mirror catches up next run.
+        if (\Nawasara\Whm\Services\AccountRegistrySync::available()) {
+            try {
+                $stats['registry'] = app(\Nawasara\Whm\Services\AccountRegistrySync::class)->sync();
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('[whm] sinkron akun ke registry gagal: '.$e->getMessage());
+            }
+        }
+
         return $stats;
     }
 
