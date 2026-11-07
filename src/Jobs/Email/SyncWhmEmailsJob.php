@@ -87,26 +87,17 @@ class SyncWhmEmailsJob extends AbstractSyncJob
 
             [$localPart, $domain] = explode('@', $email, 2);
 
-            $quotaMb = $this->parseQuota($row);
-            $diskUsedMb = $this->parseDiskUsed($row);
-
             $attrs = [
                 'cpanel_user' => $cpanelUser,
                 'email' => $email,
                 'local_part' => $localPart,
                 'domain' => $domain,
-                'quota_mb' => $quotaMb,
-                'disk_used_mb' => $diskUsedMb,
-                'humanized' => [
-                    'diskquota' => $row['_diskquota'] ?? $row['diskquota'] ?? null,
-                    'diskused' => $row['_diskused'] ?? $row['diskused'] ?? null,
-                ],
                 'suspended_login' => (bool) ($row['suspended_login'] ?? false),
                 'suspended_incoming' => (bool) ($row['suspended_incoming'] ?? false),
                 'sync_status' => WhmEmailAccount::SYNC_SYNCED,
                 'sync_error' => null,
                 'last_synced_at' => now(),
-            ];
+            ] + self::diskAttrs($row);
 
             $existing = WhmEmailAccount::where('instance', $this->instance)
                 ->where('email', $email)
@@ -151,29 +142,63 @@ class SyncWhmEmailsJob extends AbstractSyncJob
     }
 
     /**
+     * Quota and usage columns — ONLY when the WHM row carries them.
+     *
+     * The hourly light sync uses `list_pops`, which has no quota or disk
+     * fields. Writing them anyway (as null) erased what the nightly
+     * `list_pops_with_disk` run had stored, and every consumer then read
+     * null as "unlimited" — the ASN account portal showed every mailbox as
+     * "tak terbatas" (reference_sync_partial_source_overwrite).
+     *
+     * @param  array<string, mixed>  $row
+     * @return array<string, mixed>
+     */
+    public static function diskAttrs(array $row): array
+    {
+        $hasQuota = array_key_exists('_diskquota', $row) || array_key_exists('diskquota', $row);
+        $hasUsed = array_key_exists('_diskused', $row) || array_key_exists('diskused', $row);
+        if (! $hasQuota && ! $hasUsed) {
+            return [];
+        }
+
+        $out = ['humanized' => [
+            'diskquota' => $row['_diskquota'] ?? $row['diskquota'] ?? null,
+            'diskused' => $row['_diskused'] ?? $row['diskused'] ?? null,
+        ]];
+        if ($hasQuota) {
+            $out['quota_mb'] = static::parseQuota($row);
+        }
+        if ($hasUsed) {
+            $out['disk_used_mb'] = static::parseDiskUsed($row);
+        }
+
+        return $out;
+    }
+
+    /**
      * Parse quota dari raw API response.
      * WHM kadang return: '0' (unlimited), '250' (MB), '250M', '1G', dll.
      */
-    protected function parseQuota(array $row): ?int
+    protected static function parseQuota(array $row): ?int
     {
         $raw = $row['_diskquota'] ?? $row['diskquota'] ?? null;
         if ($raw === null || $raw === '' || $raw === '0' || $raw === 0 || strtolower((string) $raw) === 'unlimited') {
             return null; // unlimited
         }
-        return $this->parseToMb($raw);
+        return static::parseToMb($raw);
     }
 
-    protected function parseDiskUsed(array $row): ?float
+    protected static function parseDiskUsed(array $row): ?float
     {
         $raw = $row['_diskused'] ?? $row['diskused'] ?? null;
         if ($raw === null || $raw === '') {
             return null;
         }
-        $mb = $this->parseToMb($raw);
+        $mb = static::parseToMb($raw);
         return $mb !== null ? (float) $mb : null;
     }
 
-    protected function parseToMb($input): ?int
+    protected static function parseToMb($input): ?int
     {
         if (is_numeric($input)) {
             $val = (float) $input;

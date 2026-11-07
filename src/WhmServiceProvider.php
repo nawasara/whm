@@ -122,6 +122,8 @@ class WhmServiceProvider extends ServiceProvider
             })
                 ->name('whm:sync-emails-disk')
                 ->dailyAt('02:00')
+                // app.timezone is UTC: without this "02:00" ran at 09:00 WIB, in working hours.
+                ->timezone('Asia/Jakarta')
                 ->withoutOverlapping(60);
         });
     }
