@@ -51,7 +51,8 @@
                 <span class="text-xs text-amber-700 dark:text-amber-400">Belum pernah di-sync.</span>
             @endif
             @if ($this->pendingCount > 0)
-                <span class="inline-flex items-center gap-1 text-xs text-cyan-700 dark:text-cyan-400">
+                {{-- Poll while pending, or the page shows "pending" forever (see email table). --}}
+                <span wire:poll.3s class="inline-flex items-center gap-1 text-xs text-cyan-700 dark:text-cyan-400">
                     <x-lucide-loader class="size-3 animate-spin" /> {{ $this->pendingCount }} pending sync
                 </span>
             @endif
